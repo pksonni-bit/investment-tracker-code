@@ -1045,7 +1045,7 @@ let portfolioRange = "6M";
 function getPortfolioTrendRows(){
   const cas = new Map(growthCas);
   savedMonthlySnapshots.forEach(x=>{
-    if(/^\\d{4}-\\d{2}$/.test(x.month) && Number.isFinite(Number(x.casValue))) cas.set(x.month,Number(x.casValue));
+    if(/^\d{4}-\d{2}$/.test(x.month) && Number.isFinite(Number(x.casValue))) cas.set(x.month,Number(x.casValue));
   });
   return [...cas.keys()].sort().map(month=>{
     const snap = savedMonthlySnapshots.find(x=>x.month===month && x.npsValue!==undefined && x.npsValue!==null && Number.isFinite(Number(x.npsValue)));
