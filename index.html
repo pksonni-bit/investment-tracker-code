@@ -1,0 +1,2277 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#2456a6">
+<meta name="description" content="My Investment Tracker - apne investments, portfolio aur income ka record rakhein.">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Investment">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
+<link rel="apple-touch-icon" href="/icons/icon-192.png">
+<script src="/vendor/pdf.min.js"></script>
+<script src="/cas-pdf-parser.js"></script>
+<title>My Investment Tracker</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#f5f7fb;color:#172033;font-family:Arial,sans-serif}
+header{background:#fff;padding:17px 20px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #e5e9f0;position:sticky;top:0;z-index:2}
+h1{font-size:20px;margin:0;color:#234c9a}
+button{border:0;border-radius:9px;padding:11px 16px;background:#2456a6;color:white;font-weight:600;cursor:pointer}
+button.secondary{background:#e8eef9;color:#234c9a}
+button.danger{background:#fee9e9;color:#b42318}
+main{max-width:1050px;margin:auto;padding:18px}
+#login{max-width:420px;margin:70px auto;background:white;padding:28px;border-radius:16px;text-align:center;box-shadow:0 3px 18px #0000000c}
+.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:18px 0}
+.card{background:white;padding:17px;border-radius:13px;box-shadow:0 2px 10px #00000008}
+.card small{color:#68758a}
+.card strong{display:block;font-size:20px;margin-top:9px;overflow-wrap:anywhere}
+nav{display:flex;gap:8px;overflow:auto;padding:5px 0 14px}
+nav button{white-space:nowrap}
+nav button.active{background:#173e82}
+.panel{background:white;border-radius:14px;padding:18px;margin:14px 0;box-shadow:0 2px 10px #00000008}
+h2{font-size:18px;margin:0 0 15px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+label{display:block;font-size:13px;color:#536176;margin-bottom:5px}
+input,select,textarea{width:100%;padding:12px;border:1px solid #d8deea;border-radius:8px;font-size:15px;background:white;color:#172033}
+.field{margin-bottom:12px}
+.full{grid-column:1/-1}
+.actions{display:flex;gap:8px;flex-wrap:wrap}
+table{width:100%;border-collapse:collapse;min-width:650px}
+th,td{text-align:left;padding:12px 9px;border-bottom:1px solid #edf0f5;font-size:13px}
+th{color:#657187;background:#f8f9fc}
+.tablewrap{overflow-x:auto}
+.profit{color:#16834c}.loss{color:#c0392b}
+#message{padding:10px;border-radius:8px;margin:12px 0;display:none;background:#fff4d6;color:#765400}
+.muted{color:#718096;font-size:13px}
+@media(max-width:650px){.cards{grid-template-columns:1fr 1fr}.grid{grid-template-columns:1fr}.full{grid-column:auto}main{padding:12px}.card strong{font-size:17px}}
+
+.category-cards{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.category-card{background:#f8f9fc;border:1px solid #edf0f5;border-radius:11px;padding:13px}
+.category-card strong{display:block;font-size:18px;margin-top:7px}
+.allocation-wrap{display:flex;align-items:center;gap:25px;flex-wrap:wrap}
+.pie-chart{width:190px;height:190px;border-radius:50%;background:#e5e9f0;flex-shrink:0}
+.pie-tooltip{
+  position:fixed;
+  display:none;
+  background:#1f2937;
+  color:#fff;
+  padding:9px 12px;
+  border-radius:7px;
+  font-size:13px;
+  line-height:1.6;
+  z-index:9999;
+  pointer-events:none;
+  box-shadow:0 3px 12px rgba(0,0,0,.2);
+}.pie-legend{display:grid;gap:10px}
+.legend-item{display:flex;align-items:center;gap:8px;font-size:14px}
+.legend-dot{width:12px;height:12px;border-radius:3px;display:inline-block}
+@media(max-width:650px){.category-cards{grid-template-columns:1fr 1fr}.allocation-wrap{justify-content:center}}
+
+
+.monthly-list{display:grid;gap:10px}
+.monthly-row{padding:12px;background:#f8f9fc;border:1px solid #edf0f5;border-radius:10px}
+.monthly-head{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:8px}
+.monthly-breakdown{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:#68758a}
+
+
+@media print {
+  body * { visibility: hidden !important; }
+  #monthlyGrowthReport, #monthlyGrowthReport * {
+    visibility: visible !important;
+  }
+  #monthlyGrowthReport {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    border: 0 !important;
+    box-shadow: none !important;
+  }
+  #monthlyGrowthReport button { display: none !important; }
+  #monthlyGrowthReport table { width: 100%; font-size: 10px; }
+  #monthlyGrowthReport tr { break-inside: avoid; }
+}
+
+
+/* ===== Dashboard Refresh (visual-only; app logic unchanged) ===== */
+:root{
+  --ink:#17243b;--muted:#68778d;--line:#e7edf5;--surface:#ffffff;
+  --soft:#f4f7fc;--brand:#2456a6;--brand2:#3d76d5;
+}
+body{background:linear-gradient(180deg,#eef4ff 0,#f6f8fc 260px,#f6f8fc 100%);color:var(--ink)}
+header{
+  padding:16px max(20px,calc((100vw - 1240px)/2));
+  background:rgba(255,255,255,.94);backdrop-filter:blur(12px);
+  border-bottom:1px solid rgba(220,229,242,.9);
+  box-shadow:0 5px 24px rgba(29,55,95,.05)
+}
+h1{font-size:21px;font-weight:800;letter-spacing:-.35px;color:#1d4384}
+main{max-width:1280px;padding:22px 22px 48px}
+#app>.actions:first-child{
+  background:#fff;border:1px solid var(--line);border-radius:14px;
+  padding:12px 15px;box-shadow:0 5px 20px rgba(26,54,93,.045)
+}
+#app>.actions:first-child #welcome{font-weight:700;color:#31445f}
+button{border-radius:10px;padding:10px 15px;transition:transform .15s ease,box-shadow .15s ease,background .15s ease}
+button:hover{transform:translateY(-1px);box-shadow:0 5px 14px rgba(36,86,166,.16)}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{
+  outline:3px solid rgba(61,118,213,.22);outline-offset:2px
+}
+.card,.panel{
+  border:1px solid rgba(225,232,242,.95);
+  box-shadow:0 6px 22px rgba(29,55,95,.055);
+}
+.cards{gap:14px;margin:18px 0 22px}
+.cards>.card{
+  min-width:0;position:relative;overflow:hidden;padding:19px 20px;
+  border-radius:16px;background:linear-gradient(145deg,#fff 0%,#fbfdff 100%)
+}
+.cards>.card:after{
+  content:"";position:absolute;width:5px;left:0;top:15px;bottom:15px;
+  border-radius:0 5px 5px 0;background:#8eafe5
+}
+.cards>.card:nth-child(2):after{background:#20a67a}
+.cards>.card:nth-child(3):after{background:#e0a13b}
+.cards>.card:nth-child(4):after{background:#8b72c9}
+.card small{font-size:12px;font-weight:700;letter-spacing:.15px;color:#718098}
+.card strong{font-size:clamp(19px,2vw,25px);font-weight:800;letter-spacing:-.5px;color:#1c2d49}
+#totalProfit.profit{color:#12845b}#totalProfit.loss{color:#c0392b}
+.panel{padding:21px;border-radius:17px;margin:17px 0;background:rgba(255,255,255,.97)}
+.panel h2{font-size:17px;font-weight:800;color:#243b5d;margin-bottom:14px;letter-spacing:-.15px}
+.panel h2:after{
+  content:"";display:block;width:34px;height:3px;background:#6f99d8;
+  border-radius:4px;margin-top:9px
+}
+.category-cards{grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px}
+.category-card{
+  padding:15px 16px;border-radius:13px;background:linear-gradient(145deg,#fbfcff,#f4f7fc);
+  border:1px solid #e8edf5;transition:transform .15s ease,border-color .15s ease
+}
+.category-card:hover{transform:translateY(-2px);border-color:#cbd9ee}
+.category-card>span{font-size:12px;font-weight:700;color:#66758b}
+.category-card strong{font-size:20px;color:#203653;letter-spacing:-.3px}
+.category-card small{display:block;margin-top:5px}
+.allocation-wrap{gap:30px;align-items:center}
+.pie-chart{width:210px;height:210px;box-shadow:inset 0 0 0 1px rgba(0,0,0,.04),0 5px 18px rgba(30,55,90,.08);border:7px solid #fff}
+.pie-legend{grid-template-columns:repeat(2,minmax(190px,1fr));gap:11px 18px;flex:1}
+.legend-item{padding:7px 9px;border-radius:8px;font-size:12px;color:#53647d;cursor:pointer}
+.legend-item:hover{background:#f1f5fb;color:#244d8e}
+.legend-dot{width:10px;height:10px;flex:0 0 10px}
+#allocationInsights{
+  display:flex;gap:10px;flex-wrap:wrap;margin-top:18px
+}
+#allocationInsights p{
+  margin:0;padding:9px 12px;background:#f5f8fd;border:1px solid #e8eef7;
+  border-radius:9px;font-size:12px;color:#52627a
+}
+.monthly-list{gap:9px}
+.monthly-row{
+  padding:14px 15px;border:1px solid #e9eef6;border-radius:12px;
+  background:linear-gradient(110deg,#f8faff,#fff)
+}
+.monthly-head{align-items:center}
+.monthly-head b:first-child{color:#344966}
+.monthly-head b:last-child{font-size:16px;color:#1e4d91}
+.monthly-breakdown{gap:7px 14px}
+.monthly-breakdown span{
+  background:#eef3fa;border-radius:6px;padding:4px 7px;font-size:11px
+}
+#monthlyGrowthReport .cards{grid-template-columns:repeat(3,minmax(0,1fr))}
+#monthlyGrowthReport .cards>.card{background:#f8faff}
+#growthTotalValue{color:#1f4f91}
+#growthMonthlyChange{color:#13845c}
+#growthMonthlyPercent{color:#7656b2}
+table{min-width:760px}
+th{font-size:11px;text-transform:none;letter-spacing:.1px;color:#53647d;background:#f3f6fb;white-space:nowrap}
+td{color:#34445d;background:#fff}
+tbody tr:hover td{background:#f8faff}
+td,th{padding:12px 11px}
+.tablewrap{border:1px solid #edf1f6;border-radius:11px}
+nav{
+  position:sticky;top:68px;z-index:1;background:rgba(246,248,252,.94);
+  backdrop-filter:blur(10px);padding:10px 4px 13px;margin:4px 0
+}
+nav button{font-size:12px;padding:9px 14px}
+nav button.active{box-shadow:0 4px 12px rgba(23,62,130,.18)}
+input,select,textarea{border-color:#dce4ef;border-radius:10px}
+label{font-weight:700;color:#52627a}
+#gmailSection{padding:17px 19px;border-radius:15px}
+#gmailSection h3{margin:0 0 12px;color:#2d4262}
+#entryPanel form,#incomeForm{padding-top:3px}
+#casImportPanel .actions,#npsUpdatePanel .actions,#epfUpdatePanel .actions{align-items:center}
+#casImportPanel input[type=file],#npsUpdatePanel input[type=file],#epfUpdatePanel input[type=file]{
+  max-width:100%;font-size:12px;background:#f8faff
+}
+#jsonBackupBtn{background:#e8f5ee;color:#16734e}
+#excelImportBtn{background:#f0edfa;color:#6846a4}
+#pdfBtn{background:#2456a6}
+#message{border:1px solid #f0d994}
+#login{border:1px solid var(--line);box-shadow:0 12px 38px rgba(29,55,95,.1)}
+@media(max-width:800px){
+  main{padding:14px 12px 32px}
+  header{padding:14px 15px}
+  .pie-legend{grid-template-columns:1fr}
+  .allocation-wrap{gap:18px}
+  .pie-chart{width:180px;height:180px}
+  nav{top:58px}
+}
+@media(max-width:650px){
+  .cards{grid-template-columns:1fr 1fr;gap:9px}
+  .cards>.card{padding:14px 13px}
+  .card strong{font-size:17px}
+  .panel{padding:15px;margin:12px 0;border-radius:14px}
+  .category-cards{grid-template-columns:1fr 1fr;gap:8px}
+  .category-card{padding:11px}
+  .category-card strong{font-size:16px}
+  #monthlyGrowthReport .cards{grid-template-columns:1fr}
+  #allocationInsights{display:grid;grid-template-columns:1fr}
+  #app>.actions:first-child{gap:8px}
+  #app>.actions:first-child button{padding:9px 11px;font-size:12px}
+  nav{top:54px}
+}
+
+</style>
+</head>
+<body>
+<header>
+  <h1>My Investment Tracker</h1>
+  <div id="account" class="muted"></div>
+</header>
+
+<section id="login">
+  <h2>आपका Investment Portfolio</h2>
+  <p class="muted">अपने निवेश का हिसाब एक ही जगह रखें।</p>
+  <button id="loginBtn">Google से Login करें</button>
+  <p class="muted">आपका डेटा आपके निजी खाते में सुरक्षित रहेगा।</p>
+</section>
+
+<main id="app" hidden>
+  <div class="actions" style="justify-content:space-between">
+    <span class="muted" id="welcome"></span>
+    <button id="gmailConnectBtn" class="secondary">Gmail Connect करें</button>
+    <button class="secondary" id="logoutBtn">Logout</button>
+  </div>
+  <div id="message"></div>
+  <section class="card" id="gmailSection"><h3>Gmail Investment Statements</h3><button id="fetchGmailBtn" class="secondary">नए निवेश ईमेल खोजें</button><button id="fetchNsdlBtn" class="secondary">NSDL CAS PDF खोजें</button><div id="gmailResults" class="muted">ईमेल खोजने के लिए बटन दबाएँ।</div></section>
+
+  <div class="cards">
+    <div class="card"><small>कुल निवेश</small><strong id="totalInvested">₹0</strong></div>
+    <div class="card"><small>वर्तमान मूल्य</small><strong id="totalCurrent">₹0</strong></div>
+    <div class="card"><small>लाभ / हानि</small><strong id="totalProfit">₹0</strong></div>
+    <div class="card"><small>Return %</small><strong id="totalReturn">0%</strong></div>
+  </div>
+
+
+  <section class="panel">
+    <h2>श्रेणी अनुसार निवेश</h2>
+    <div class="category-cards" id="categorySummary"></div>
+  </section>
+
+  <section class="panel">
+    <h2>Portfolio Allocation</h2>
+    <div class="allocation-wrap">
+      <div class="pie-chart" id="allocationChart"></div>
+      <div class="pie-legend" id="allocationLegend"></div>
+    </div><div id="pieTooltip" class="pie-tooltip"></div>
+    <div id="allocationInsights"></div>
+  </section>
+
+
+  <section class="panel">
+    <h2>Monthly Investment Summary</h2>
+    <div class="monthly-list" id="monthlySummary"></div>
+  </section>
+
+  <section class="panel" id="monthlyGrowthReport">
+    <h2>Monthly Growth Report</h2>
+    <p class="muted">NSDL CAS, NPS और EPF/EPS का महीनेवार विवरण</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin:12px 0">
+      <button type="button" id="exportMonthlyGrowthBtn">PDF Export</button>
+    </div>
+    <p id="monthlyHistoryStatus" class="muted">पहले CAS PDF का Preview देखें।</p>
+
+    <div class="cards">
+      <div class="card"><small>कुल Portfolio Value (CAS + NPS)</small><strong id="growthTotalValue">—</strong></div>
+      <div class="card"><small>पिछले महीने से बदलाव</small><strong id="growthMonthlyChange">—</strong></div>
+      <div class="card"><small>बदलाव प्रतिशत</small><strong id="growthMonthlyPercent">—</strong></div>
+    </div>
+
+    <div id="growthChart" class="monthly-list">
+      अभी मासिक रिपोर्ट का डेटा तैयार नहीं है।
+    </div>
+
+    <div style="overflow-x:auto">
+      <table id="growthTable">
+        <thead>
+          <tr>
+            <th>महीना</th>
+            <th>NSDL CAS</th>
+            <th>NPS</th>
+            <th>EPF/EPS योगदान</th>
+            <th>कुल Portfolio Value (CAS + NPS)</th>
+            <th>मासिक बदलाव</th>
+          </tr>
+        </thead>
+        <tbody id="growthTableBody"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>Dividend & Interest Income</h2>
+    <div class="cards">
+      <div class="card"><small>कुल प्राप्त आय</small><strong id="totalIncome">₹0</strong></div>
+      <div class="card"><small>Dividend</small><strong id="totalDividend">₹0</strong></div>
+      <div class="card"><small>Interest</small><strong id="totalInterest">₹0</strong></div>
+    </div>
+    <form id="incomeForm">
+      <div class="grid">
+        <div class="field">
+          <label>आय का प्रकार</label>
+          <select id="incomeType" required>
+            <option value="Dividend">Dividend</option>
+            <option value="Interest">Interest</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>कंपनी / फंड / बैंक का नाम</label>
+          <input id="incomeSource" required placeholder="नाम लिखें">
+        </div>
+        <div class="field">
+          <label>प्राप्त राशि (₹)</label>
+          <input id="incomeAmount" type="number" min="0.01" step="0.01" required>
+        </div>
+        <div class="field">
+          <label>प्राप्ति की तारीख</label>
+          <input id="incomeDate" type="date" required>
+        </div>
+        <div class="field full">
+          <label>नोट (वैकल्पिक)</label>
+          <input id="incomeNotes" placeholder="कोई अतिरिक्त जानकारी">
+        </div>
+      </div>
+      <button type="submit">Income सेव करें</button>
+    </form>
+    <h3>Income History</h3>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>प्रकार</th><th>नाम</th><th>राशि</th><th>तारीख</th><th>Action</th></tr></thead>
+        <tbody id="incomeBody"><tr><td colspan="5">अभी कोई आय दर्ज नहीं है।</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+
+  <nav id="tabs">
+    <button class="active" data-filter="All">सभी</button>
+    <button class="secondary" data-filter="Shares">Shares</button>
+    <button class="secondary" data-filter="Mutual Funds">Mutual Funds</button>
+    <button class="secondary" data-filter="ETF">ETF</button>
+    <button class="secondary" data-filter="NPS">NPS</button>
+    <button class="secondary" data-filter="EPF">EPF</button>
+    <button class="secondary" data-filter="SGB">SGB</button>
+    <button class="secondary" data-filter="REIT">REIT</button>
+    <button class="secondary" data-filter="InvIT">InvIT</button>
+  </nav>
+
+  <section class="panel" id="entryPanel">
+    <h2 id="formTitle">नया निवेश जोड़ें</h2>
+    <form id="holdingForm">
+      <input type="hidden" id="editId">
+      <div class="grid">
+        <div class="field">
+          <label>Investment Category</label>
+          <select id="category" required>
+            <option value="Shares">Shares</option>
+            <option value="Mutual Funds">Mutual Funds</option>
+  <option value="ETF">ETF</option>
+            <option value="NPS">NPS</option>
+            <option value="EPF">EPF</option>
+            <option value="SGB">SGB</option>
+            <option value="REIT">REIT</option>
+            <option value="InvIT">InvIT</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Company / Fund / Account Name</label>
+          <input id="name" required placeholder="नाम लिखें">
+        </div>
+        <div class="field">
+          <label>कुल निवेश राशि (₹)</label>
+          <input id="invested" type="number" min="0" step="0.01" required placeholder="जैसे 50000">
+        </div>
+        <div class="field">
+          <label>वर्तमान मूल्य (₹)</label>
+          <input id="current" type="number" min="0" step="0.01" required placeholder="जैसे 55000">
+        </div>
+        <div class="field">
+          <label>Quantity / Units (वैकल्पिक)</label>
+          <input id="quantity" type="number" min="0" step="any" placeholder="जैसे 100">
+        </div>
+        <div class="field">
+          <label>निवेश की तारीख</label>
+          <input id="date" type="date">
+        </div>
+        <div class="field full">
+          <label>नोट (वैकल्पिक)</label>
+          <input id="notes" placeholder="कोई अतिरिक्त जानकारी">
+        </div>
+        <div class="field full">
+          <label id="detailsTitle">Shares की अतिरिक्त जानकारी</label>
+          <div id="categoryFields" class="grid"></div>
+        </div>
+      </div>
+      <div class="actions">
+        <button type="submit" id="saveBtn">निवेश सेव करें</button>
+        <button type="button" class="secondary" id="cancelBtn" hidden>Cancel</button>
+      </div>
+    </form>
+  </section>
+
+
+  <section class="panel" id="casImportPanel">
+    <h2>NSDL CAS Import Preview</h2>
+    <p class="muted">CAS की JSON या सीधे PDF फाइल चुनें। Preview देखने से कोई डेटा सेव नहीं होगा।</p>
+    <div class="actions">
+      <input type="file" id="casPdfFile" accept=".pdf,application/pdf">
+      <button type="button" id="casPdfPreviewBtn">PDF पढ़ें और Preview देखें</button>
+    </div>
+    <div id="casPdfPasswordArea" hidden>
+      <label for="casPdfPassword">CAS PDF Password (यदि PDF लॉक है)</label>
+      <input type="password" id="casPdfPassword" autocomplete="off" placeholder="पासवर्ड केवल यहीं डालें">
+      <p class="muted">पासवर्ड सेव या कहीं भेजा नहीं जाएगा।</p>
+    </div>
+    <div class="actions">
+      <input type="file" id="casFile" accept=".json,application/json">
+      <button type="button" id="casPreviewBtn">Preview देखें</button>
+      <button type="button" id="casImportBtn" class="secondary" disabled>Preview देखकर Import करें</button>
+      <button type="button" id="saveMonthlyHistoryBtn" disabled>Preview किए CAS महीनों को सेव करें</button>
+    </div>
+    <div id="casPreviewStatus" class="muted">अभी कोई CAS फाइल नहीं चुनी गई है।</div>
+    <div id="casPreviewSummary"></div>
+    <div class="tablewrap" id="casPreviewTableWrap" hidden>
+      <table>
+        <thead><tr><th>श्रेणी</th><th>नाम</th><th>खाता</th><th>वर्तमान मूल्य</th><th>स्थिति</th></tr></thead>
+        <tbody id="casPreviewBody"></tbody>
+      </table>
+    </div>
+  </section>
+
+
+
+
+
+  <section class="panel" id="npsUpdatePanel">
+    <h2>NPS Tier I Statement से अपडेट</h2>
+    <p class="muted">NPS की PDF चुनें। पासवर्ड हो तो यहीं डालें। पहले Preview बनेगा; सेव करने से पहले पुराने और नए आँकड़े मिलाएँ। पासवर्ड सेव या कहीं भेजा नहीं जाएगा।</p>
+    <div class="actions">
+      <input type="file" id="npsPdfFile" accept=".pdf,application/pdf">
+      <button type="button" id="npsPreviewBtn">NPS PDF पढ़ें</button>
+    </div>
+    <div id="npsPasswordArea" hidden>
+      <label for="npsPdfPassword">NPS PDF Password</label>
+      <input type="password" id="npsPdfPassword" autocomplete="off" placeholder="PDF का पासवर्ड">
+    </div>
+    <div id="npsPreviewStatus" class="muted">अभी कोई NPS PDF नहीं चुनी गई है।</div>
+    <div id="npsPreviewSummary"></div>
+    <button type="button" id="npsSaveBtn" disabled>NPS Tier I अपडेट सेव करें</button>
+    <button type="button" id="npsHistorySaveBtn" disabled>NPS महीने का इतिहास सेव करें</button>
+  </section>
+
+
+  <section class="panel" id="epfUpdatePanel">
+    <h2>EPF Passbook PDF से अपडेट</h2>
+    <p class="muted">EPFO Passbook PDF चुनें। पासवर्ड हो तो दर्ज करें। पहले Preview देखें; आपकी EPF जानकारी Save करने से पहले मिलाई जाएगी। पासवर्ड सेव नहीं होगा।</p>
+    <div class="actions">
+      <input type="file" id="epfPdfFile" accept=".pdf,application/pdf">
+      <button type="button" id="epfPreviewBtn">EPF PDF पढ़ें</button>
+    </div>
+    <div id="epfPasswordArea" hidden>
+      <label for="epfPdfPassword">EPF PDF Password</label>
+      <input type="password" id="epfPdfPassword" autocomplete="off" placeholder="PDF का पासवर्ड">
+    </div>
+    <div id="epfPreviewStatus" class="muted">अभी कोई EPF PDF नहीं चुनी गई है।</div>
+    <div id="epfPreviewSummary"></div>
+    <button type="button" id="epfSaveBtn" disabled>EPF अपडेट सेव करें</button>
+    <button type="button" id="epfHistorySaveBtn" disabled>EPF महीनेवार इतिहास सेव करें</button>
+  </section>
+
+  <section class="panel">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+      <div>
+        <h2>आपका Portfolio</h2>
+        <div id="activeCategoryLabel" class="muted" style="margin-top:6px;font-weight:600;color:#2563eb">सभी निवेश</div>
+      </div>
+      <div class="actions">
+        <button type="button" id="pdfBtn">PDF Report</button>
+        <button type="button" id="excelExportBtn" class="secondary">Excel Export</button>
+        <button type="button" id="jsonBackupBtn" class="secondary">JSON Full Backup</button>
+        <button type="button" id="excelImportBtn" class="secondary">Excel Import</button>
+        <input type="file" id="excelFile" accept=".xlsx,.xls" hidden>
+        <input id="search" placeholder="नाम खोजें..." style="max-width:210px">
+      </div>
+    </div>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Category</th><th>नाम</th><th>Symbol</th><th>Exchange</th><th>निवेश</th><th>वर्तमान मूल्य</th><th>लाभ/हानि</th><th>Action</th></tr></thead>
+        <tbody id="holdingsBody"><tr><td colspan="8">अभी कोई निवेश नहीं है।</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+  <p class="muted">यह शुरुआती संस्करण है। वर्तमान मूल्य अभी स्वयं अपडेट करना होगा।</p>
+</main>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-app.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup, reauthenticateWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-auth.js";
+import { getFirestore, collection, addDoc, getDocs, getDoc, setDoc, updateDoc, deleteDoc, doc, serverTimestamp } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-firestore.js";
+pdfjsLib.GlobalWorkerOptions.workerSrc = "/vendor/pdf.worker.min.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBhqWkeoda1Bqz1i4ejYueMAaPQ_t7Xjs4",
+  authDomain: "my-investment-tracker-new.firebaseapp.com",
+  projectId: "my-investment-tracker-new",
+  storageBucket: "my-investment-tracker-new.firebasestorage.app",
+  messagingSenderId: "89268418185",
+  appId: "1:89268418185:web:7e89e10ecf4b209b21b858",
+  measurementId: "G-3NL0MQM4WN"
+};
+
+const appFirebase = initializeApp(firebaseConfig);
+const auth = getAuth(appFirebase);
+const db = getFirestore(appFirebase);
+const provider = new GoogleAuthProvider();
+const gmailProvider = new GoogleAuthProvider();
+gmailProvider.addScope("https://www.googleapis.com/auth/gmail.readonly");
+
+let user = null;
+let holdings = [];
+let incomes = [];
+let filter = "All";
+
+const $ = id => document.getElementById(id);
+const money = n => new Intl.NumberFormat("en-IN",{style:"currency",currency:"INR",maximumFractionDigits:2}).format(Number(n)||0);
+const safe = s => String(s ?? "").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const userCollection = () => collection(db,"users",user.uid,"holdings");
+const incomeCollection = () => collection(db,"users",user.uid,"income");
+
+function message(text){
+  $("message").textContent = text;
+  $("message").style.display = "block";
+}
+function hideMessage(){ $("message").style.display = "none"; }
+
+const categoryFieldDefinitions = {
+  "Shares": [
+    ["symbol","Share Symbol / NSE-BSE Code","text"],
+    ["isin","ISIN","text"],
+    ["exchange","Exchange (NSE / BSE)","text"],
+    ["purchasePrice","प्रति शेयर खरीद मूल्य (₹)","number"],
+    ["broker","Broker का नाम","text"]
+  ],
+  "Mutual Funds": [
+    ["amc","AMC का नाम","text"],
+    ["isin","ISIN","text"],
+    ["scheme","Scheme का नाम","text"],
+    ["folio","Folio Number","text"],
+    ["nav","वर्तमान NAV (₹)","number"],
+    ["sipAmount","मासिक SIP राशि (₹)","number"]
+  ],
+  "ETF": [
+    ["symbol","ETF Trading Symbol","text"],
+    ["exchange","Exchange (NSE / BSE)","text"],
+    ["isin","ISIN","text"],
+    ["account","Demat Account / Broker","text"],
+    ["units","Units","number"],
+    ["price","Current Price per Unit (₹)","number"]
+  ],
+  "SGB": [
+    ["isin","ISIN","text"],
+    ["account","Demat Account / Broker","text"],
+    ["series","Bond Series","text"],
+    ["units","Units","number"],
+    ["faceValue","Face Value per Unit (₹)","number"],
+    ["couponRate","Coupon Rate (%)","number"],
+    ["maturityDate","Maturity Date","text"]
+  ],
+  "REIT": [
+    ["isin","ISIN","text"],
+    ["account","Demat Account / Broker","text"],
+    ["units","Units","number"],
+    ["price","Current Price per Unit (₹)","number"]
+  ],
+  "InvIT": [
+    ["isin","ISIN","text"],
+    ["account","Demat Account / Broker","text"],
+    ["units","Units","number"],
+    ["price","Current Price per Unit (₹)","number"]
+  ],
+  "NPS": [
+    ["pranLast4","PRAN के अंतिम 4 अंक","text"],
+    ["tier","Tier (I / II)","text"],
+    ["employeeContribution","Employee Contribution (₹)","number"],
+    ["employerContribution","Employer Contribution (₹)","number"],
+    ["pensionContribution","Pension Contribution (₹)","number"]
+  ],
+  "EPF": [
+    ["uanLast4","UAN के अंतिम 4 अंक","text"],
+    ["employeeShare","Employee Share (₹)","number"],
+    ["employerShare","Employer Share (₹)","number"],
+    ["epsBalance","EPS Balance (₹)","number"],
+    ["monthlyContribution","मासिक Contribution (₹)","number"],
+    ["interest","ब्याज (₹)","number"]
+  ]
+};
+
+function renderCategoryFields(category, values = {}) {
+  const fields = categoryFieldDefinitions[category] || [];
+  $("detailsTitle").textContent = category + " की अतिरिक्त जानकारी";
+  $("categoryFields").innerHTML = fields.map(([key,label,type]) => `
+    <div class="field">
+      <label>${safe(label)}</label>
+      <input id="detail_${key}" type="${type}" ${type === "number" ? 'min="0" step="any"' : ''} value="${safe(values[key] ?? '')}" placeholder="वैकल्पिक">
+    </div>
+  `).join("");
+}
+
+function readCategoryFields() {
+  const result = {};
+  (categoryFieldDefinitions[$("category").value] || []).forEach(([key]) => {
+    const el = $("detail_" + key);
+    result[key] = el ? (el.value.trim()) : "";
+  });
+  return result;
+}
+
+$("category").addEventListener("change", () => renderCategoryFields($("category").value));
+renderCategoryFields($("category").value);
+
+
+$("loginBtn").onclick = async () => {
+  try { await signInWithPopup(auth,provider); }
+  catch(e){ message(e.message); }
+};
+$("gmailConnectBtn").onclick = async () => {
+  try {
+    if (!auth.currentUser) return message("पहले Google Login करें");
+    const result = await reauthenticateWithPopup(auth.currentUser, gmailProvider);
+    const credential = GoogleAuthProvider.credentialFromResult(result);
+    window.gmailAccessToken = credential?.accessToken || null;
+    if (window.gmailAccessToken) message("Gmail अनुमति सफलतापूर्वक मिल गई");
+    else message("Gmail Access Token नहीं मिला। दोबारा प्रयास करें");
+  } catch(e) { message(e.message); }
+};
+$("fetchGmailBtn").onclick = async () => {
+  const token = window.gmailAccessToken;
+  if (!token) return message("पहले Gmail Connect करें");
+  const box = $("gmailResults");
+  box.textContent = "Gmail ईमेल खोजे जा रहे हैं...";
+  try {
+    const q = encodeURIComponent("newer_than:2y {CAS NSDL CDSL mutual fund NPS EPFO EPF dividend interest}");
+    const response = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages?q=" + q + "&maxResults=30", {headers:{Authorization:"Bearer " + token}});
+    if (!response.ok) throw new Error("Gmail API: " + response.status + " " + await response.text());
+    const data = await response.json();
+    if (!data.messages?.length) { box.textContent = "कोई संबंधित ईमेल नहीं मिला।"; return; }
+    const items = await Promise.all(data.messages.map(async m => {
+      const r = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/" + m.id + "?format=metadata&metadataHeaders=Subject&metadataHeaders=From&metadataHeaders=Date", {headers:{Authorization:"Bearer " + token}});
+      if (!r.ok) throw new Error("ईमेल विवरण नहीं मिला: " + r.status);
+      const x = await r.json();
+      const h = x.payload?.headers || [];
+      const get = n => h.find(v => v.name.toLowerCase() === n.toLowerCase())?.value || "";
+      return {id:m.id, subject:get("Subject"), from:get("From"), date:get("Date")};
+    }));
+    box.innerHTML = items.map(x => "<div style=\"padding:10px;border-bottom:1px solid #ddd\"><b>" + safe(x.subject) + "</b><br>" + safe(x.from) + "<br><small>" + safe(x.date) + "</small></div>").join("");
+    message(items.length + " संबंधित ईमेल मिले। अभी कोई डेटा सेव नहीं हुआ।");
+  } catch(e) { box.textContent = e.message; }
+};
+
+$("fetchNsdlBtn").onclick = async () => {
+  const token = window.gmailAccessToken;
+  const box = $("gmailResults");
+  if (!token) return message("पहले Gmail Connect करें");
+  box.textContent = "NSDL CAS ईमेल खोजे जा रहे हैं...";
+  try {
+    const headers = {Authorization: "Bearer " + token};
+    const q = encodeURIComponent("from:nsdl-cas@nsdl.co.in subject:CAS newer_than:2y");
+    const res = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages?q=" + q + "&maxResults=20", {headers});
+    if (!res.ok) throw new Error("Gmail API Error: " + res.status);
+    const data = await res.json();
+    box.replaceChildren();
+    if (!data.messages?.length) {
+      box.textContent = "कोई NSDL CAS ईमेल नहीं मिला।";
+      return;
+    }
+    for (const m of data.messages) {
+      const r = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/" + m.id + "?format=full", {headers});
+      if (!r.ok) throw new Error("ईमेल पढ़ने में समस्या: " + r.status);
+      const mail = await r.json();
+      const hs = mail.payload?.headers || [];
+      const get = n => hs.find(h => h.name.toLowerCase() === n.toLowerCase())?.value || "";
+      const row = document.createElement("div");
+      row.style.cssText = "padding:12px;border-bottom:1px solid #ddd";
+      const heading = document.createElement("b");
+      heading.textContent = get("Subject") || "NSDL CAS";
+      row.appendChild(heading);
+      const date = document.createElement("p");
+      date.textContent = get("Date");
+      row.appendChild(date);
+      const parts = [];
+      const walk = part => {
+        if (part.filename && part.filename.toLowerCase().endsWith(".pdf")) parts.push(part);
+        (part.parts || []).forEach(walk);
+      };
+      walk(mail.payload || {});
+      if (!parts.length) {
+        const note = document.createElement("p");
+        note.textContent = "इस ईमेल में PDF Attachment नहीं मिला।";
+        row.appendChild(note);
+      }
+      for (const part of parts) {
+        const btn = document.createElement("button");
+        btn.textContent = "PDF डाउनलोड करें: " + part.filename;
+        btn.onclick = async () => {
+          try {
+            let encoded = part.body?.data;
+            if (part.body?.attachmentId) {
+              const a = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/" + m.id + "/attachments/" + part.body.attachmentId, {headers});
+              if (!a.ok) throw new Error("PDF प्राप्त नहीं हुआ: " + a.status);
+              encoded = (await a.json()).data;
+            }
+            if (!encoded) throw new Error("PDF डेटा उपलब्ध नहीं है");
+            const raw = atob(encoded.replace(/-/g, "+").replace(/_/g, "/"));
+            const bytes = Uint8Array.from(raw, c => c.charCodeAt(0));
+            const url = URL.createObjectURL(new Blob([bytes], {type: "application/pdf"}));
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = part.filename;
+            link.click();
+            setTimeout(() => URL.revokeObjectURL(url), 60000);
+          } catch(e) { message(e.message); }
+        };
+        row.appendChild(btn);
+      }
+      box.appendChild(row);
+    }
+    message(data.messages.length + " NSDL CAS ईमेल मिले।");
+  } catch(e) {
+    box.textContent = e.message;
+  }
+};
+
+$("logoutBtn").onclick = () => signOut(auth);
+
+onAuthStateChanged(auth, async currentUser => {
+  user = currentUser;
+  $("login").hidden = !!user;
+  $("app").hidden = !user;
+  $("account").textContent = user ? user.email : "";
+  if(user){
+    $("welcome").textContent = "नमस्ते, " + (user.displayName || user.email);
+    await loadHoldings();
+    await loadIncome();
+    await loadMonthlySnapshots();
+    renderMonthlyGrowth();
+  } else {
+    holdings = [];
+    incomes = [];
+    savedMonthlySnapshots = [];
+  }
+});
+
+async function loadHoldings(){
+  try {
+    const snap = await getDocs(userCollection());
+    holdings = snap.docs.map(d=>({id:d.id,...d.data()}));
+    render();
+  } catch(e){ message("डेटा लोड नहीं हुआ: "+e.message); }
+}
+
+async function loadIncome(){
+  try {
+    const snap = await getDocs(incomeCollection());
+    incomes = snap.docs.map(d=>({id:d.id,...d.data()}));
+    renderIncome();
+  } catch(e){ message("Income डेटा लोड नहीं हुआ: "+e.message); }
+}
+
+function renderIncome(){
+  const dividend = incomes.filter(x=>x.type==="Dividend").reduce((a,x)=>a+(Number(x.amount)||0),0);
+  const interest = incomes.filter(x=>x.type==="Interest").reduce((a,x)=>a+(Number(x.amount)||0),0);
+  $("totalIncome").textContent = money(dividend+interest);
+  $("totalDividend").textContent = money(dividend);
+  $("totalInterest").textContent = money(interest);
+
+  $("incomeBody").innerHTML = incomes.length ? [...incomes]
+    .sort((a,b)=>(b.date||"").localeCompare(a.date||""))
+    .map(x=>`<tr>
+      <td>${safe(x.type)}</td>
+      <td><b>${safe(x.source)}</b><br><span class="muted">${safe(x.notes||"")}</span></td>
+      <td>${money(x.amount)}</td>
+      <td>${safe(x.date||"")}</td>
+      <td><button type="button" class="danger" data-income-delete="${safe(x.id)}">Delete</button></td>
+    </tr>`).join("")
+    : '<tr><td colspan="5">अभी कोई आय दर्ज नहीं है।</td></tr>';
+
+  $("incomeBody").querySelectorAll("[data-income-delete]").forEach(b=>{
+    b.onclick=async()=>{
+      if(!confirm("क्या यह Income Entry हटानी है?")) return;
+      try {
+        await deleteDoc(doc(db,"users",user.uid,"income",b.dataset.incomeDelete));
+        await loadIncome();
+        message("Income Entry हटा दी गई।");
+      } catch(e){ message("Delete नहीं हुआ: "+e.message); }
+    };
+  });
+}
+
+$("incomeForm").onsubmit = async e => {
+  e.preventDefault();
+  if(!user) return;
+  const data = {
+    type:$("incomeType").value,
+    source:$("incomeSource").value.trim(),
+    amount:Number($("incomeAmount").value),
+    date:$("incomeDate").value,
+    notes:$("incomeNotes").value.trim(),
+    createdAt:serverTimestamp(),
+    updatedAt:serverTimestamp()
+  };
+  if(!data.source || !data.date || !Number.isFinite(data.amount) || data.amount<=0){
+    message("कृपया नाम, सही राशि और तारीख भरें।");
+    return;
+  }
+  try {
+    await addDoc(incomeCollection(),data);
+    $("incomeForm").reset();
+    await loadIncome();
+    message("Dividend / Interest Entry सेव हो गई।");
+  } catch(e){ message("Income सेव नहीं हुई: "+e.message); }
+};
+
+
+const growthCas = [
+  ["2025-10",2411236.77],["2025-11",2471635.96],
+  ["2025-12",2540060.71],["2026-01",2638355.25],
+  ["2026-02",2720831.31],["2026-03",2545378.00],
+  ["2026-04",2820965.31],["2026-05",2879894.67],
+  ["2026-06",2899905.86],["2026-07",2963570.71],
+  ["2026-08",3011968.17],["2026-09",2943139.19],
+  ["2026-10",3010819.24]
+];
+
+const growthNpsNav = {
+  "2026-04":31.4496,"2026-05":31.4375,
+  "2026-06":32.2043,"2026-07":32.3543,
+  "2026-08":32.2827,"2026-09":31.6710,
+  "2026-10":31.4530
+};
+
+const growthEpf = {
+  "2026-03":[12028,10778,1250],
+  "2026-04":[12028,10778,1250],
+  "2026-05":[12093,10843,1250],
+  "2026-06":[12093,10843,1250],
+  "2026-07":[12497,11247,1250],
+  "2026-08":[12703,11453,1250],
+  "2026-09":[12703,10620,2083],
+  "2026-10":[12703,10620,2083]
+};
+
+let savedMonthlySnapshots = [];
+
+async function loadMonthlySnapshots(){
+  savedMonthlySnapshots = [];
+  if(!user) return;
+  try {
+    const ref = collection(db, "users", user.uid, "monthlySnapshots");
+    const snap = await getDocs(ref);
+    savedMonthlySnapshots = snap.docs.map(d=>({id:d.id,...d.data()}));
+  } catch(e) {
+    message("मासिक इतिहास लोड नहीं हुआ: " + e.message);
+  }
+}
+
+function renderMonthlyGrowth(){
+  const cas = new Map(growthCas);
+  savedMonthlySnapshots.forEach(s=>{
+    if(/^\d{4}-\d{2}$/.test(s.month) &&
+       Number.isFinite(Number(s.casValue))){
+      cas.set(s.month, Number(s.casValue));
+    }
+  });
+  const months = [...cas.keys()].sort();
+  let previous = null;
+  let previousNps = null;
+
+  const rows = months.map(month=>{
+    const casValue = cas.get(month) || 0;
+    const savedNps = savedMonthlySnapshots.find(s =>
+      s.month === month && Number.isFinite(Number(s.npsValue))
+    );
+    const npsValue = savedNps
+      ? Number(savedNps.npsValue)
+      : (growthNpsNav[month] ? 19861.5382 * growthNpsNav[month] : null);
+    const total = casValue + (npsValue || 0);
+    const savedEpf = savedMonthlySnapshots.find(s =>
+      s.month === month &&
+      s.epfContributionTotal !== undefined &&
+      s.epfContributionTotal !== null &&
+      Number.isFinite(Number(s.epfContributionTotal))
+    );
+    const epf = savedEpf
+      ? [
+          Number(savedEpf.epfContributionEmployee || 0),
+          Number(savedEpf.epfContributionEmployer || 0),
+          Number(savedEpf.epfContributionEPS || 0)
+        ]
+      : growthEpf[month];
+    const contribution = savedEpf
+      ? Number(savedEpf.epfContributionTotal)
+      : (epf ? epf.reduce((a,b)=>a+b,0) : null);
+    const change = previous === null || (npsValue !== null && previousNps === null) ? null : Math.round(total * 100) / 100 - Math.round(previous * 100) / 100;
+    previous = total;
+    previousNps = npsValue;
+
+    const label = new Date(month+"-01T00:00:00")
+      .toLocaleDateString("hi-IN",{month:"long",year:"numeric"});
+
+    return {month,label,casValue,npsValue,total,contribution,change};
+  });
+
+  const latest = rows[rows.length-1];
+  const prior = rows[rows.length-2];
+  const pct = prior.total ? (latest.change/prior.total*100) : 0;
+
+  $("growthTotalValue").textContent = money(latest.total);
+  $("growthMonthlyChange").textContent =
+    latest.change === null ? "—" : money(latest.change);
+  $("growthMonthlyPercent").textContent =
+    latest.change === null ? "—" : pct.toFixed(2)+"%";
+
+  $("growthTableBody").innerHTML = rows.slice().reverse().map(r=>`
+    <tr>
+      <td>${safe(r.label)}</td>
+      <td>${money(r.casValue)}</td>
+      <td>${r.npsValue===null ? "—" : money(r.npsValue)}</td>
+      <td>${r.contribution===null ? "—" : money(r.contribution)}</td>
+      <td><b>${money(r.total)}</b></td>
+      <td class="${r.change===null ? "" : r.change>=0 ? "profit" : "loss"}">
+        ${r.change===null ? "—" : money(r.change)}
+      </td>
+    </tr>
+  `).join("");
+
+  $("growthChart").innerHTML = rows.slice(-6).reverse().map(r=>`
+    <div class="monthly-row">
+      <div class="monthly-head">
+        <b>${safe(r.label)}</b><b>${money(r.total)}</b>
+      </div>
+      <div class="monthly-breakdown">
+        <span>NSDL CAS: ${money(r.casValue)}</span>
+        <span>NPS: ${r.npsValue===null ? "—" : money(r.npsValue)}</span>
+        <span>EPF/EPS योगदान: ${r.contribution===null ? "—" : money(r.contribution)}</span>
+      </div>
+    </div>
+  `).join("");
+}
+
+function render(){
+  const costKnown = holdings.filter(x=>x.details?.costKnown !== false);
+  const epfEps = holdings.filter(x=>x.category==="EPF").reduce((s,x)=>s+(Number(x.details?.epsBalance)||0),0);
+  const invested = costKnown.reduce((s,x)=>s+(Number(x.invested)||0),0);
+  const current = holdings.reduce((s,x)=>s+(Number(x.current)||0),0) + epfEps;
+  const profit = costKnown.filter(x=>x.category!=="EPF").reduce((s,x)=>s+(Number(x.current)||0)-(Number(x.invested)||0),0);
+  $("totalInvested").textContent = money(invested);
+  $("totalCurrent").textContent = money(current);
+  $("totalProfit").textContent = money(profit);
+  $("totalProfit").className = profit>=0 ? "profit" : "loss";
+  $("totalReturn").textContent = (invested ? (profit/invested*100).toFixed(2) : "0.00")+"%";
+
+  const categories = [
+    {name:"Shares", label:"शेयर", color:"#3678d4"},
+    {name:"Mutual Funds", label:"Mutual Funds", color:"#19a477"},
+    {name:"ETF", label:"ETF", color:"#5b8bd9"},
+    {name:"NPS", label:"NPS", color:"#e6a23c"},
+    {name:"EPF", label:"EPF", color:"#8966c5"},
+    {name:"EPS", label:"EPS / Pension", color:"#b078cf"},
+    {name:"SGB", label:"SGB", color:"#d18b32"},
+    {name:"REIT", label:"REIT", color:"#268c9b"},
+    {name:"InvIT", label:"InvIT", color:"#a65c91"}
+  ];
+  const summary = categories.map(c=>{
+    const items = c.name==="EPS" ? holdings.filter(x=>x.category==="EPF") : holdings.filter(x=>x.category===c.name);
+    return {
+      ...c,
+      invested:c.name==="EPS" ? items.reduce((a,x)=>a+(Number(x.details?.epsBalance)||0),0) : items.filter(x=>x.details?.costKnown !== false).reduce((a,x)=>a+(Number(x.invested)||0),0),
+      current:c.name==="EPS" ? items.reduce((a,x)=>a+(Number(x.details?.epsBalance)||0),0) : items.reduce((a,x)=>a+(Number(x.current)||0),0)
+    };
+  });
+  $("categorySummary").innerHTML = summary.map(c=>`
+    <div class="category-card">
+      <span>${c.label}</span>
+      <strong>${money(c.invested)}</strong>
+      <small class="muted">वर्तमान: ${money(c.current)}</small>
+    </div>
+  `).join("");
+
+  const totalAllocation = summary.reduce((a,c)=>a+c.current,0);
+  let angle = 0;
+  const segments = summary.filter(c=>c.current>0).map(c=>{
+    const start = angle;
+    angle += c.current/totalAllocation*360;
+    return `${c.color} ${start}deg ${angle}deg`;
+  });
+  $("allocationChart").style.background = totalAllocation
+    ? `conic-gradient(${segments.join(",")})`
+    : "#e5e9f0";
+  $("allocationLegend").innerHTML = summary.map(c=>{
+    const percent = totalAllocation ? (c.current/totalAllocation*100).toFixed(1) : "0.0";
+    return `<div class="legend-item" role="button" tabindex="0"
+      data-allocation-filter="${c.name === "EPS" ? "EPF" : c.name}">
+      <span class="legend-dot" style="background:${c.color}"></span>
+      <span>${safe(c.label)}: ${money(c.current)} (${percent}%)</span>
+    </div>`;
+  }).join("");
+const pieTooltip = $("pieTooltip");
+const pieChart = $("allocationChart");
+
+pieChart.onmousemove = e => {
+  const rect = pieChart.getBoundingClientRect();
+  const x = e.clientX - rect.left - rect.width / 2;
+  const y = e.clientY - rect.top - rect.height / 2;
+
+  let angle = (Math.atan2(y, x) * 180 / Math.PI + 90 + 360) % 360;
+
+  let accumulated = 0;
+  let selected = null;
+
+  for (const c of summary) {
+    const percent = totalAllocation ? c.current / totalAllocation * 100 : 0;
+    const sweep = percent * 3.6;
+
+    if (angle >= accumulated && angle < accumulated + sweep) {
+      selected = c;
+      break;
+    }
+    accumulated += sweep;
+  }
+
+  if (!selected) {
+    pieTooltip.style.display = "none";
+    return;
+  }
+
+  const percent = (selected.current / totalAllocation * 100).toFixed(1);
+
+  pieTooltip.innerHTML =
+    `<strong>${safe(selected.label)}</strong><br>${money(selected.current)}<br>${percent}%`;
+
+  pieTooltip.style.left = (e.clientX + 14) + "px";
+  pieTooltip.style.top = (e.clientY + 14) + "px";
+  pieTooltip.style.display = "block";
+};
+
+pieChart.onmouseleave = () => {
+  pieTooltip.style.display = "none";
+};
+  $("allocationLegend").querySelectorAll("[data-allocation-filter]").forEach(item => {
+    const openCategory = () => {
+      filter = item.dataset.allocationFilter;
+      $("tabs").querySelectorAll("button").forEach(b => {
+        const active = b.dataset.filter === filter;
+        b.classList.toggle("active", active);
+        b.classList.toggle("secondary", !active);
+      });
+      render();
+      $("holdingsBody").closest("section").scrollIntoView({
+        behavior: "smooth",
+        block: "start"
+      });
+    };
+    item.onclick = openCategory;
+    item.onkeydown = e => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        openCategory();
+      }
+    };
+  });
+
+  const rankedAllocation = summary.filter(c => c.current > 0)
+    .sort((a, b) => b.current - a.current);
+
+  $("allocationInsights").innerHTML = rankedAllocation.length
+    ? `<p><strong>सबसे अधिक:</strong> ${safe(rankedAllocation[0].label)} — ${money(rankedAllocation[0].current)}</p>
+       <p><strong>सबसे कम:</strong> ${safe(rankedAllocation[rankedAllocation.length - 1].label)} — ${money(rankedAllocation[rankedAllocation.length - 1].current)}</p>
+       <p><strong>कुल Current Value:</strong> ${money(totalAllocation)}</p>`
+    : "";
+
+  const monthlyMap = new Map();
+  holdings.forEach(x=>{
+    const key = (x.date||"").slice(0,7);
+    if(!/^\d{4}-\d{2}$/.test(key)) return;
+    if(!monthlyMap.has(key)) monthlyMap.set(key,{});
+    const item = monthlyMap.get(key);
+    item[x.category] = (item[x.category]||0)+(Number(x.invested)||0);
+  });
+  const monthlyRows = [];
+  const now = new Date();
+  for(let i=0;i<6;i++){
+    const d = new Date(now.getFullYear(),now.getMonth()-i,1);
+    const key = d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0");
+    const data = monthlyMap.get(key)||{};
+    const total = categories.reduce((a,c)=>a+(data[c.name]||0),0);
+    monthlyRows.push(`
+      <div class="monthly-row">
+        <div class="monthly-head">
+          <b>${d.toLocaleDateString("hi-IN",{month:"long",year:"numeric"})}</b>
+          <b>${money(total)}</b>
+        </div>
+        <div class="monthly-breakdown">
+          ${categories.map(c=>`<span>${c.label}: ${money(data[c.name]||0)}</span>`).join("")}
+        </div>
+      </div>
+    `);
+  }
+  $("monthlySummary").innerHTML = monthlyRows.join("");
+
+  $("activeCategoryLabel").textContent =
+    filter === "All" ? "सभी निवेश" : "चुनी गई श्रेणी: " + filter;
+
+  const q = $("search").value.trim().toLowerCase();
+  const list = holdings.filter(x=>(filter==="All" || x.category===filter) && (x.name||"").toLowerCase().includes(q));
+  $("holdingsBody").innerHTML = list.length ? list.map(x=>{
+    const costKnown = x.details?.costKnown !== false;
+    const isEpf = x.category === "EPF";
+    const p = (Number(x.current)||0)-(Number(x.invested)||0);
+    const epfSummary = isEpf
+      ? `<br><span class="muted">Employee: ${money(x.details?.employeeShare)} | Employer: ${money(x.details?.employerShare)} | EPS: ${money(x.details?.epsBalance)} | EPF + EPS कुल: ${money((Number(x.current)||0)+(Number(x.details?.epsBalance)||0))}</span>`
+      : "";
+    return `<tr>
+      <td>${safe(x.category)}</td><td><b>${safe(x.name)}</b><br><span class="muted">${safe(x.date||"")}</span>${epfSummary}</td>
+      <td>${["Shares","ETF","REIT","InvIT"].includes(x.category) ? safe(x.details?.symbol||"—") : "—"}</td><td>${["Shares","ETF","REIT","InvIT"].includes(x.category) ? safe(x.details?.exchange||"—") : "—"}</td>
+      <td>${costKnown ? money(x.invested) : "लागत उपलब्ध नहीं"}</td><td>${money(x.current)}</td>
+      <td class="${p>=0?"profit":"loss"}">${isEpf ? "—" : (costKnown ? money(p) : "—")}</td>
+      <td><div class="actions"><button class="secondary" data-edit="${safe(x.id)}">Edit</button><button class="danger" data-delete="${safe(x.id)}">Delete</button></div></td>
+    </tr>`;
+  }).join("") : '<tr><td colspan="8">इस श्रेणी में अभी कोई निवेश नहीं है।</td></tr>';
+
+  $("holdingsBody").querySelectorAll("[data-edit]").forEach(b=>b.onclick=()=>editHolding(b.dataset.edit));
+  $("holdingsBody").querySelectorAll("[data-delete]").forEach(b=>b.onclick=()=>removeHolding(b.dataset.delete));
+}
+
+$("holdingForm").onsubmit = async e => {
+  e.preventDefault();
+  if(!user) return;
+  hideMessage();
+  const data = {
+    category:$("category").value,
+    name:$("name").value.trim(),
+    invested:Number($("invested").value),
+    current:Number($("current").value),
+    quantity:Number($("quantity").value)||0,
+    date:$("date").value,
+    notes:$("notes").value.trim(),
+    details:readCategoryFields(),
+    updatedAt:serverTimestamp()
+  };
+  if(!data.name || data.invested<0 || data.current<0){ message("कृपया सही जानकारी भरें।"); return; }
+  try {
+    const id=$("editId").value;
+    if(id) await updateDoc(doc(db,"users",user.uid,"holdings",id),data);
+    else await addDoc(userCollection(),{...data,createdAt:serverTimestamp()});
+    resetForm();
+    await loadHoldings();
+    message(id ? "निवेश अपडेट हो गया।" : "निवेश सेव हो गया।");
+  } catch(err){ message("सेव नहीं हुआ: "+err.message); }
+};
+
+function editHolding(id){
+  const x=holdings.find(h=>h.id===id);
+  if(!x) return;
+  $("editId").value=x.id;
+  $("category").value=x.category;
+  renderCategoryFields(x.category, x.details || {});
+  $("name").value=x.name||"";
+  $("invested").value=x.invested??0;
+  $("current").value=x.current??0;
+  $("quantity").value=x.quantity||"";
+  $("date").value=x.date||"";
+  $("notes").value=x.notes||"";
+  $("formTitle").textContent="निवेश में बदलाव करें";
+  $("saveBtn").textContent="Update करें";
+  $("cancelBtn").hidden=false;
+  $("entryPanel").scrollIntoView({behavior:"smooth"});
+}
+async function removeHolding(id){
+  if(!confirm("क्या आप यह निवेश हटाना चाहते हैं?")) return;
+  try {
+    await deleteDoc(doc(db,"users",user.uid,"holdings",id));
+    await loadHoldings();
+    message("निवेश हटा दिया गया।");
+  } catch(e){ message("Delete नहीं हुआ: "+e.message); }
+}
+function resetForm(){
+  $("holdingForm").reset();
+  renderCategoryFields($("category").value);
+  $("editId").value="";
+  $("formTitle").textContent="नया निवेश जोड़ें";
+  $("saveBtn").textContent="निवेश सेव करें";
+  $("cancelBtn").hidden=true;
+}
+$("cancelBtn").onclick=resetForm;
+$("search").oninput=render;
+
+$("tabs").querySelectorAll("button").forEach(b=>{
+  b.onclick=()=>{
+    filter=b.dataset.filter;
+    $("tabs").querySelectorAll("button").forEach(x=>{
+      x.classList.toggle("active",x===b);
+      x.classList.toggle("secondary",x!==b);
+    });
+    render();
+  };
+});
+
+// PDF Report
+$("pdfBtn").onclick = () => {
+  if (!holdings.length && !incomes.length) {
+    message("PDF बनाने के लिए पहले निवेश या Income Entry जोड़ें।");
+    return;
+  }
+  const w = window.open("", "_blank");
+  if (!w) {
+    message("PDF रिपोर्ट खोलने के लिए browser में popup allow करें।");
+    return;
+  }
+  const esc = v => String(v ?? "").replace(/[&<>"']/g, c => ({
+    "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+  }[c]));
+  const costKnown = holdings.filter(x=>x.details?.costKnown !== false);
+  const epfEps = holdings.filter(x=>x.category==="EPF").reduce((a,x)=>a+(Number(x.details?.epsBalance)||0),0);
+  const invested = costKnown.reduce((a,x)=>a+(Number(x.invested)||0),0);
+  const current = holdings.reduce((a,x)=>a+(Number(x.current)||0),0) + epfEps;
+  const profit = costKnown.filter(x=>x.category!=="EPF").reduce((a,x)=>a+(Number(x.current)||0)-(Number(x.invested)||0),0);
+  const rows = holdings.map(x=>`<tr>
+    <td>${esc(x.category)}</td><td>${esc(x.name)}${x.category==="EPF" ? `<br><small>Employee Share: ${money(x.details?.employeeShare)} | Employer Share: ${money(x.details?.employerShare)}</small>` : ""}</td>
+    <td>${x.details?.costKnown === false ? "लागत उपलब्ध नहीं" : money(x.invested)}</td><td>${money(x.current)}</td>
+    <td>${x.category==="EPF" || x.details?.costKnown === false ? "—" : money((Number(x.current)||0)-(Number(x.invested)||0))}</td>
+    <td>${esc(x.date||"")}</td>
+  </tr>`).join("") + (epfEps ? `<tr>
+    <td>EPS / Pension</td><td>EPFO Pension Balance</td>
+    <td>${money(epfEps)}</td><td>${money(epfEps)}</td><td>—</td><td></td>
+  </tr>` : "");
+  const dividend = incomes.filter(x=>x.type==="Dividend").reduce((a,x)=>a+(Number(x.amount)||0),0);
+  const interest = incomes.filter(x=>x.type==="Interest").reduce((a,x)=>a+(Number(x.amount)||0),0);
+  const incomeRows = incomes.map(x=>`<tr>
+    <td>${esc(x.type)}</td><td>${esc(x.source)}</td>
+    <td>${money(x.amount)}</td><td>${esc(x.date||"")}</td>
+    <td>${esc(x.notes||"")}</td>
+  </tr>`).join("");
+  w.document.write(`<!doctype html><html><head><meta charset="utf-8">
+
+    <title>Investment Portfolio Report</title>
+    <style>
+      body{font-family:Arial,sans-serif;padding:24px;color:#172033}
+      h1{color:#234c9a}table{width:100%;border-collapse:collapse}
+      th,td{border:1px solid #ddd;padding:8px;text-align:left;font-size:12px}
+      th{background:#eef2f8}.summary{display:flex;gap:30px;margin:20px 0}
+      @media print{button{display:none}}
+    </style></head><body>
+    <h1>Investment Portfolio Report</h1>
+    <p>Report Date: ${new Date().toLocaleDateString("en-IN")}</p>
+    <div class="summary">
+      <div><b>Total Invested</b><br>${money(invested)}</div>
+      <div><b>Current Value</b><br>${money(current)}</div>
+      <div><b>Profit / Loss (जहाँ लागत उपलब्ध)</b><br>${money(profit)}</div>
+    </div>
+    <table><thead><tr><th>Category</th><th>Name</th><th>Invested</th>
+    <th>Current Value</th><th>Profit/Loss</th><th>Date</th></tr></thead>
+    <tbody>${rows}</tbody></table>
+    <h2>Dividend & Interest Income</h2>
+    <div class="summary">
+      <div><b>Total Income</b><br>${money(dividend+interest)}</div>
+      <div><b>Dividend</b><br>${money(dividend)}</div>
+      <div><b>Interest</b><br>${money(interest)}</div>
+    </div>
+    <table><thead><tr><th>Type</th><th>Source</th><th>Amount</th><th>Date</th><th>Notes</th></tr></thead>
+    <tbody>${incomeRows}</tbody></table>
+    <p>Generated by My Investment Tracker</p>
+    <script>window.onload=()=>window.print();<\/script>
+    </body></html>`);
+  w.document.close();
+};
+
+// Excel Export (.xlsx)
+$("excelExportBtn").onclick = async () => {
+  try {
+    if (!holdings.length) {
+      message("Export करने के लिए पहले निवेश की Entry जोड़ें।");
+      return;
+    }
+    const XLSX = await import("https://cdn.jsdelivr.net/npm/xlsx@0.18.5/+esm");
+    const rows = holdings.map(x=>({
+      category:x.category || "",
+      name:x.name || "",
+      invested:Number(x.invested)||0,
+      current:Number(x.current)||0,
+      quantity:Number(x.quantity)||0,
+      date:x.date || "",
+      notes:x.notes || "",
+      details:JSON.stringify(x.details || {})
+    }));
+    const incomeRows = incomes.map(x=>({
+      type:x.type || "",
+      source:x.source || "",
+      amount:Number(x.amount)||0,
+      date:x.date || "",
+      notes:x.notes || ""
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const incomeWs = XLSX.utils.json_to_sheet(incomeRows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb,ws,"Investments");
+    XLSX.utils.book_append_sheet(wb,incomeWs,"Income");
+    XLSX.writeFile(wb,"Investment-Tracker-Backup.xlsx");
+    message("Excel फाइल डाउनलोड हो गई।");
+  } catch(e) {
+    message("Excel Export नहीं हुआ: "+e.message);
+  }
+};
+
+// Full JSON Backup: Holdings + Income with Firebase document IDs
+$("jsonBackupBtn").onclick = () => {
+  try {
+    if (!user) {
+      message("पहले Google Login करें।");
+      return;
+    }
+
+    const backup = {
+      backupType: "Investment Tracker Full Backup",
+      backupVersion: 1,
+      exportedAt: new Date().toISOString(),
+      firebaseProject: firebaseConfig.projectId,
+      user: {
+        uid: user.uid,
+        email: user.email || ""
+      },
+      holdingsCount: holdings.length,
+      incomeCount: incomes.length,
+      holdings: holdings.map(x => ({...x})),
+      incomes: incomes.map(x => ({...x}))
+    };
+
+    const json = JSON.stringify(backup, (key, value) => {
+      if (value && typeof value.toDate === "function") {
+        return {
+          __type: "FirestoreTimestamp",
+          seconds: value.seconds,
+          nanoseconds: value.nanoseconds
+        };
+      }
+      return value;
+    }, 2);
+
+    const blob = new Blob([json], {type:"application/json"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "Investment-Tracker-Full-Backup-" +
+      new Date().toISOString().slice(0,10) + ".json";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+
+    message("Full JSON Backup डाउनलोड शुरू हो गया।");
+  } catch(e) {
+    message("JSON Backup नहीं हुआ: " + e.message);
+  }
+};
+
+// Excel Import (.xlsx / .xls)
+$("excelImportBtn").onclick = () => $("excelFile").click();
+
+$("excelFile").onchange = async e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  try {
+    const XLSX = await import("https://cdn.jsdelivr.net/npm/xlsx@0.18.5/+esm");
+    const data = await file.arrayBuffer();
+    const wb = XLSX.read(data,{type:"array"});
+    const investmentSheet = wb.Sheets["Investments"] || wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(investmentSheet,{defval:""});
+    const allowed = ["Shares","Mutual Funds","ETF","NPS","EPF","SGB","REIT","InvIT"];
+
+    const valid = rows.map(r=>{
+      const category = String(r.category || r.Category || "").trim();
+      const name = String(r.name || r.Name || "").trim();
+      const invested = Number(r.invested ?? r.Invested ?? 0);
+      const current = Number(r.current ?? r.Current ?? r["Current Value"] ?? 0);
+      let details = r.details || r.Details || {};
+      if (typeof details === "string") {
+        try { details = JSON.parse(details || "{}"); } catch { details = {}; }
+      }
+      if (!allowed.includes(category) || !name ||
+          !Number.isFinite(invested) || !Number.isFinite(current) ||
+          invested < 0 || current < 0) return null;
+      return {
+        category,name,invested,current,
+        quantity:Number(r.quantity ?? r.Quantity ?? 0) || 0,
+        date:String(r.date || r.Date || ""),
+        notes:String(r.notes || r.Notes || ""),
+        details:details && typeof details === "object" ? details : {},
+        createdAt:serverTimestamp(),
+        updatedAt:serverTimestamp()
+      };
+    }).filter(Boolean);
+
+    const incomeSheet = wb.Sheets["Income"];
+    const incomeRows = incomeSheet
+      ? XLSX.utils.sheet_to_json(incomeSheet,{defval:""})
+      : [];
+    const validIncome = incomeRows.map(r=>{
+      const type = String(r.type || r.Type || "").trim();
+      const source = String(r.source || r.Source || "").trim();
+      const amount = Number(r.amount ?? r.Amount ?? 0);
+      const date = String(r.date || r.Date || "");
+      if (!["Dividend","Interest"].includes(type) || !source ||
+          !Number.isFinite(amount) || amount <= 0 || !date) return null;
+      return {
+        type,source,amount,date,
+        notes:String(r.notes || r.Notes || ""),
+        createdAt:serverTimestamp(),
+        updatedAt:serverTimestamp()
+      };
+    }).filter(Boolean);
+
+    if (!valid.length && !validIncome.length) {
+      message("इस Excel में सही Investment या Income Entries नहीं मिलीं।");
+      return;
+    }
+
+    const total = valid.length + validIncome.length;
+    if (!confirm(total+" नई Entries जोड़ी जाएँगी (Investments: "+valid.length+", Income: "+validIncome.length+")। मौजूदा Entries नहीं हटेंगी। जारी रखें?")) return;
+
+    for (const item of valid) await addDoc(userCollection(),item);
+    for (const item of validIncome) await addDoc(incomeCollection(),item);
+
+    await loadHoldings();
+    await loadIncome();
+    message(total+" Entries Excel से Import हो गईं।");
+  } catch(err) {
+    message("Excel Import नहीं हुआ: "+err.message);
+  } finally {
+    e.target.value="";
+  }
+};
+
+
+let casPreviewRecords = [];
+let casPreviewTrendRecords = [];
+
+
+
+// NPS Tier I PDF: local password handling, preview first, update existing record only.
+let npsPendingUpdate = null;
+let epfPendingUpdate = null;
+
+function parseNpsStatement(lines) {
+  const text = lines.join("\n").replace(/\u00a0/g, " ");
+  const norm = text.replace(/\s+/g, " ");
+  const dateRange = norm.match(/([A-Za-z]{3})\s+(\d{1,2}),?\s+(\d{4})\s+To\s+([A-Za-z]{3})\s+(\d{1,2}),?\s+(\d{4})/i);
+  const monthMap = {jan:"01",feb:"02",mar:"03",apr:"04",may:"05",jun:"06",jul:"07",aug:"08",sep:"09",oct:"10",nov:"11",dec:"12"};
+  const toIso = (m,d,y) => {
+    const mm = monthMap[m.toLowerCase()];
+    if (!mm) throw new Error("Statement की तारीख समझ नहीं आई।");
+    return `${y}-${mm}-${String(d).padStart(2,"0")}`;
+  };
+  if (!dateRange) throw new Error("यह NPS Transaction Statement नहीं लगती: अवधि नहीं मिली।");
+  const statementDate = toIso(dateRange[4],dateRange[5],dateRange[6]);
+
+  const tierI = /NPS Transaction Statement for Tier I Account/i.test(norm) &&
+    /Tier I Status\s+ACTIVE/i.test(norm);
+  if (!tierI) throw new Error("यह Active NPS Tier I statement नहीं है। Tier II या अन्य PDF स्वीकार नहीं होगी।");
+
+  const pran = norm.match(/\bPRAN\s+(\d{12})\b/i);
+  const schemeMatch = norm.match(/(SBI PENSION FUNDS? PVT LTD SCHEME\s*-\s*CORPORATE-CG)/i);
+  if (!schemeMatch) throw new Error("SBI Pension Funds Corporate-CG scheme नहीं मिली।");
+
+  const summaryAt = norm.indexOf("Investment Summary");
+  if (summaryAt < 0) throw new Error("Investment Summary नहीं मिला।");
+  const summaryText = norm.slice(summaryAt, summaryAt + 1800);
+  const summaryNumbers = summaryText.match(/([\d,]+\.\d{2})\s+(\d{1,4})\s+([\d,]+\.\d{2})\s+([\d,]+\.\d{2})\s+([\d,]+\.\d{2})/);
+  if (!summaryNumbers) throw new Error("Current Value और Contribution के आँकड़े नहीं पढ़े जा सके।");
+  const number = v => Number(String(v).replace(/,/g,""));
+  const current = number(summaryNumbers[1]);
+  const contributions = Number(summaryNumbers[2]);
+  const totalContribution = number(summaryNumbers[3]);
+  const totalWithdrawal = number(summaryNumbers[4]);
+  const gain = number(summaryNumbers[5]);
+
+  const schemeAt = norm.indexOf("Investment Details - Scheme Wise Summary");
+  if (schemeAt < 0) throw new Error("Scheme Wise Summary नहीं मिला।");
+  const schemeText = norm.slice(schemeAt, schemeAt + 1200);
+  const schemeRow = schemeText.match(/SBI PENSION FUNDS? PVT LTD SCHEME\s*-\s*CORPORATE-CG\s+([\d,]+\.\d{2})\s+([\d,]+\.\d{4,})\s+([\d.]+)/i);
+  if (!schemeRow) throw new Error("NPS Units और NAV नहीं पढ़े जा सके।");
+  const schemeValue = number(schemeRow[1]);
+  const units = number(schemeRow[2]);
+  const nav = number(schemeRow[3]);
+  if (![current,totalContribution,totalWithdrawal,gain,units,nav].every(Number.isFinite) ||
+      current <= 0 || totalContribution < 0 || units <= 0 || nav <= 0 ||
+      Math.abs(current-schemeValue) > 1) {
+    throw new Error("PDF के आँकड़ों का आपस में मिलान नहीं हुआ।");
+  }
+
+  const xirrMatch = norm.match(/(?:XIRR|Return on Investment)[^%]{0,100}?(\d+(?:\.\d+)?)\s*%/i)
+    || norm.match(/(\d+(?:\.\d+)?)\s*%\s*(?:XIRR|Return on Investment)/i);
+  const generation = norm.match(/Statement Generation Date:\s*([A-Za-z]+)\s+(\d{1,2}),?\s+(\d{4})/i);
+  return {
+    statementDate, current, totalContribution, totalWithdrawal, gain,
+    contributions, units, nav, xirrPercent:xirrMatch ? Number(xirrMatch[1]) : null,
+    statementGenerationDate:generation ? toIso(generation[1].slice(0,3),generation[2],generation[3]) : "",
+    pranLast4:pran ? pran[1].slice(-4) : "",
+    scheme:"SBI PENSION FUNDS PVT LTD SCHEME - CORPORATE-CG",
+    pensionFund:"SBI Pension Funds Pvt Ltd",
+    schemeChoice:"Corporate Standard",
+    schemeAllocationPercent:100,
+    tier:"Tier I",
+    source:"NPS Transaction Statement PDF"
+  };
+}
+
+$("npsPreviewBtn").onclick = async () => {
+  npsPendingUpdate = null;
+  $("npsSaveBtn").disabled = true;
+  $("npsHistorySaveBtn").disabled = true;
+  $("npsPreviewSummary").innerHTML = ""
+  const file = $("npsPdfFile").files[0];
+  if (!file) { $("npsPreviewStatus").textContent = "पहले NPS PDF चुनें।"; return; }
+  $("npsPreviewBtn").disabled = true;
+  $("npsPreviewStatus").textContent = "PDF आपके browser में पढ़ी जा रही है...";
+  try {
+    const extracted = await window.extractCasPdfText(file, $("npsPdfPassword").value);
+    const parsed = parseNpsStatement(extracted.lines);
+    const candidates = holdings.filter(h => {
+      if (h.category !== "NPS") return false;
+      const tier = String(h.details?.tier || "");
+      const name = String(h.name || "");
+      const scheme = String(h.details?.scheme || "");
+      const tierMatches = /^Tier\s*I$/i.test(tier) || /NPS\s*Tier\s*I/i.test(name);
+      const schemeMatches = !scheme || /SBI PENSION FUNDS.*CORPORATE-CG/i.test(scheme);
+      return tierMatches && schemeMatches;
+    }).filter(h => !h.details?.pranLast4 || !parsed.pranLast4 || String(h.details.pranLast4) === parsed.pranLast4);
+
+    if (candidates.length !== 1) {
+      $("npsPreviewStatus").textContent = candidates.length === 0
+        ? "आपकी मौजूदा NPS Tier I Entry से मिलान नहीं मिला। सुरक्षा के लिए नई Entry नहीं बनाई गई।"
+        : "एक से अधिक NPS Tier I Entries मिलीं। सही Entry चुनने की जरूरत है; अभी कुछ सेव नहीं हुआ।";
+      return;
+    }
+    const existing = candidates[0];
+    const oldDate = String(existing.details?.statementDate || existing.date || "");
+    if (oldDate && /^\d{4}-\d{2}-\d{2}$/.test(oldDate) && parsed.statementDate < oldDate) {
+      throw new Error("यह PDF ऐप में मौजूद NPS statement से पुरानी है। पुराना डेटा overwrite नहीं किया गया।");
+    }
+    npsPendingUpdate = {id:existing.id, parsed, existing};
+    const fmt = v => "₹" + Number(v || 0).toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2});
+    $("npsPreviewStatus").textContent = `PDF पढ़ ली गई: ${extracted.pageCount} पेज | Statement तारीख: ${parsed.statementDate}`;
+    $("npsPreviewSummary").innerHTML = `
+      <p><b>मौजूदा NPS Tier I Entry:</b> ${safe(existing.name)}</p>
+      <p><b>Current Value:</b> ${fmt(existing.current)} → <b>${fmt(parsed.current)}</b></p>
+      <p><b>Total Contribution:</b> ${fmt(existing.invested)} → <b>${fmt(parsed.totalContribution)}</b></p>
+      <p><b>Units:</b> ${Number(existing.quantity||0).toLocaleString("en-IN")} → <b>${parsed.units.toLocaleString("en-IN")}</b></p>
+      <p><b>NAV:</b> ${safe(existing.details?.nav || "—")} → <b>${parsed.nav}</b></p>
+      <p><b>XIRR:</b> ${safe(existing.details?.xirrPercent ?? "—")}% → <b>${parsed.xirrPercent === null ? "PDF में नहीं मिला" : parsed.xirrPercent + "%"}</b></p>
+      <p><b>Notional Gain/Loss:</b> ${fmt(parsed.gain)} | <b>Withdrawals:</b> ${fmt(parsed.totalWithdrawal)} | <b>Contributions:</b> ${parsed.contributions}</p>
+      <p class="muted">यह केवल Preview है। अभी Firestore में कोई बदलाव नहीं हुआ। PRAN का केवल अंतिम 4 अंक ही रखे जाएँगे।</p>`;
+    $("npsSaveBtn").disabled = false;
+    $("npsHistorySaveBtn").disabled = false;
+    $("npsPasswordArea").hidden = true;
+  } catch (err) {
+    if (err.name === "PasswordException") {
+      $("npsPasswordArea").hidden = false;
+      $("npsPreviewStatus").textContent = "PDF पासवर्ड से सुरक्षित है। पासवर्ड डालकर दोबारा NPS PDF पढ़ें।";
+    } else {
+      $("npsPreviewStatus").textContent = "NPS Preview नहीं बन पाया: " + err.message;
+    }
+  } finally {
+    $("npsPreviewBtn").disabled = false;
+  }
+};
+
+$("npsSaveBtn").onclick = async () => {
+  if (!user || !npsPendingUpdate) return;
+  const {id,parsed,existing} = npsPendingUpdate;
+  if (!confirm(`मौजूदा NPS Tier I रिकॉर्ड अपडेट होगा।\nCurrent Value: ₹${Number(existing.current||0).toLocaleString("en-IN")} → ₹${parsed.current.toLocaleString("en-IN")}\nStatement Date: ${parsed.statementDate}\n\nक्या अपडेट सेव करें?`)) return;
+  $("npsSaveBtn").disabled = true;
+  try {
+    const details = {
+      ...(existing.details || {}),
+      tier:"Tier I",
+      scheme:parsed.scheme,
+      schemeChoice:parsed.schemeChoice,
+      schemeAllocationPercent:parsed.schemeAllocationPercent,
+      totalContribution:parsed.totalContribution,
+      totalWithdrawal:parsed.totalWithdrawal,
+      notionalGainLoss:parsed.gain,
+      xirrPercent:parsed.xirrPercent,
+      units:parsed.units,
+      nav:parsed.nav,
+      numberOfContributions:parsed.contributions,
+      statementDate:parsed.statementDate,
+      statementGenerationDate:parsed.statementGenerationDate,
+      pensionFund:parsed.pensionFund,
+      source:parsed.source,
+      ...(parsed.pranLast4 ? {pranLast4:parsed.pranLast4} : {})
+    };
+    const data = {
+      invested:parsed.totalContribution,
+      current:parsed.current,
+      quantity:parsed.units,
+      date:parsed.statementDate,
+      notes:`NPS Tier I Statement as on ${parsed.statementDate}; XIRR ${parsed.xirrPercent ?? "N/A"}%; Notional Gain/Loss ₹${parsed.gain.toLocaleString("en-IN")}; Withdrawals ₹${parsed.totalWithdrawal.toLocaleString("en-IN")}; ${parsed.contributions} contributions`,
+      details,
+      updatedAt:serverTimestamp()
+    };
+    await updateDoc(doc(db,"users",user.uid,"holdings",id),data);
+    npsPendingUpdate = null;
+    await loadHoldings();
+    $("npsPreviewStatus").textContent = "NPS Tier I रिकॉर्ड सफलतापूर्वक अपडेट हो गया। नई Entry नहीं बनी है।";
+    $("npsPreviewSummary").innerHTML = "";
+    $("npsPdfPassword").value = "";
+    $("npsPdfFile").value = "";
+    message("मौजूदा NPS Tier I Entry अपडेट हो गई।");
+  } catch (err) {
+    $("npsSaveBtn").disabled = false;
+    message("NPS अपडेट सेव नहीं हुआ: " + err.message);
+  }
+};
+
+
+
+$("npsHistorySaveBtn").onclick = async () => {
+  if (!user || !npsPendingUpdate) {
+    message("पहले NPS PDF का Preview तैयार करें।");
+    return;
+  }
+
+  const parsed = npsPendingUpdate.parsed;
+  const month = String(parsed.statementDate || "").slice(0, 7);
+  if (!/^\d{4}-\d{2}$/.test(month)) {
+    message("NPS Statement की तारीख सही नहीं है।");
+    return;
+  }
+
+  const ref = doc(db, "users", user.uid, "monthlySnapshots", month);
+  const btn = $("npsHistorySaveBtn");
+  btn.disabled = true;
+
+  try {
+    const old = await getDoc(ref);
+    const oldData = old.exists() ? old.data() : {};
+    const replacing = oldData.npsValue !== undefined && oldData.npsValue !== null;
+
+    const fmt = v => "₹" + Number(v || 0).toLocaleString("en-IN", {
+      minimumFractionDigits: 2, maximumFractionDigits: 2
+    });
+
+    const prompt = replacing
+      ? `${month} का NPS इतिहास पहले से मौजूद है।\nपुराना: ${fmt(oldData.npsValue)}\nनया: ${fmt(parsed.current)}\nक्या इसे बदलना है?`
+      : `${month} का NPS इतिहास सेव होगा।\nStatement Date: ${parsed.statementDate}\nCurrent Value: ${fmt(parsed.current)}\nUnits: ${parsed.units}\nNAV: ${parsed.nav}\n\nCAS और बाकी पुराने रिकॉर्ड सुरक्षित रहेंगे। क्या सेव करें?`;
+
+    if (!confirm(prompt)) {
+      btn.disabled = false;
+      return;
+    }
+
+    await setDoc(ref, {
+      month,
+      npsValue: Number(parsed.current),
+      npsUnits: Number(parsed.units),
+      npsNav: Number(parsed.nav),
+      npsStatementDate: parsed.statementDate,
+      npsSource: parsed.source,
+      npsUpdatedAt: serverTimestamp()
+    }, {merge:true});
+
+    await loadMonthlySnapshots();
+    renderMonthlyGrowth();
+    $("npsPreviewStatus").textContent =
+      `${month} का NPS महीनेवार इतिहास सेव हो गया।`;
+    message("NPS Monthly History सेव हो गया।");
+  } catch (err) {
+    btn.disabled = false;
+    message("NPS इतिहास सेव नहीं हुआ: " + err.message);
+  }
+};
+
+$("epfPdfFile").addEventListener("change", () => {
+  epfPendingUpdate = null;
+  $("epfSaveBtn").disabled = true;
+  $("epfHistorySaveBtn").disabled = true;
+  $("epfPreviewSummary").innerHTML = "";
+  $("epfPreviewStatus").textContent = "EPF PDF चुनी गई है। Preview बनाने के लिए बटन दबाएँ।";
+});
+
+$("epfPreviewBtn").onclick = async () => {
+  epfPendingUpdate = null;
+  $("epfSaveBtn").disabled = true;
+  $("epfHistorySaveBtn").disabled = true;
+  $("epfPreviewSummary").innerHTML = "";
+  const file = $("epfPdfFile").files[0];
+  if (!file) {
+    $("epfPreviewStatus").textContent = "पहले EPF PDF चुनें।";
+    return;
+  }
+  $("epfPreviewBtn").disabled = true;
+  $("epfPreviewStatus").textContent = "EPF PDF आपके browser में पढ़ी जा रही है...";
+  try {
+    const extracted = await window.extractCasPdfText(file, $("epfPdfPassword").value);
+    window.epfDebugLines = extracted.lines.filter(line => /Mar-2026|Due-Month|\bCR\b/i.test(line));
+    const parsed = window.parseEpfPassbook(extracted.lines);
+    parsed.monthlyContributions =
+      window.parseEpfMonthlyTransactions(extracted.lines);
+    const monthly = parsed.monthlyContributions;
+    const sum = key => monthly.reduce((total, row) => total + row[key], 0);
+    parsed.monthlyContributionTotalsMatch =
+      monthly.length > 0 &&
+      Math.abs(sum("employee") - Number(parsed.contributionEmployee)) < 1 &&
+      Math.abs(sum("employer") - Number(parsed.contributionEmployer)) < 1 &&
+      Math.abs(sum("eps") - Number(parsed.contributionEPS)) < 1;
+    const candidates = holdings.filter(h =>
+      h.category === "EPF" &&
+      String(h.details?.uanLast4 || "").trim() === parsed.uanLast4
+    );
+
+    if (candidates.length !== 1) {
+      $("epfPreviewStatus").textContent = candidates.length === 0
+        ? "UAN के अंतिम 4 अंकों से मौजूदा EPF Entry नहीं मिली। पहले Entry में UAN के अंतिम 4 अंक भरें। कोई नई Entry नहीं बनाई गई।"
+        : "एक से अधिक EPF Entries में यही UAN मिला। सुरक्षा के लिए अपडेट रोक दिया गया।";
+      return;
+    }
+
+    const existing = candidates[0];
+    const oldDate = String(existing.details?.closingDate || existing.details?.statementDate || "");
+    if (oldDate && /^\d{4}-\d{2}-\d{2}$/.test(oldDate) && parsed.closingDate < oldDate) {
+      throw new Error("यह PDF ऐप में मौजूद EPF विवरण से पुरानी है। पुराना डेटा overwrite नहीं किया गया।");
+    }
+
+    epfPendingUpdate = {id:existing.id, parsed, existing};
+    const fmt = v => "₹" + Number(v || 0).toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2});
+    const warning = parsed.futureClosingDate
+      ? `<p style="color:#b45309"><b>चेतावनी:</b> Closing Balance की तारीख ${parsed.closingDate} PDF की Printed Date ${parsed.printedDate} से आगे है। यह भविष्य की तारीख वाला balance है, आज का balance नहीं।</p>`
+      : "";
+
+    $("epfPreviewStatus").textContent =
+      `PDF पढ़ ली गई: ${extracted.pageCount} पेज | UAN अंतिम 4 अंक: ${parsed.uanLast4}`;
+
+    $("epfPreviewSummary").innerHTML = `
+      <h3>PDF Text जाँच</h3><pre style="white-space:pre-wrap">${safe((window.epfDebugLines || []).join("\n"))}</pre>
+      <p><b>मौजूदा EPF Entry:</b> ${safe(existing.name)}</p>
+      <p><b>UAN के अंतिम 4 अंक:</b> ${parsed.uanLast4}</p>
+      <p><b>PDF Printed Date:</b> ${parsed.printedDate} | <b>Closing Balance Date:</b> ${parsed.closingDate}</p>
+      ${warning}
+      <h3>Closing Balance</h3>
+      <p>Employee Share: ${fmt(existing.details?.employeeShare)} → <b>${fmt(parsed.employeeShare)}</b></p>
+      <p>Employer Share: ${fmt(existing.details?.employerShare)} → <b>${fmt(parsed.employerShare)}</b></p>
+      <p>EPS / Pension: ${fmt(existing.details?.epsBalance)} → <b>${fmt(parsed.epsBalance)}</b></p>
+      <p>EPF Current (Employee + Employer): ${fmt(existing.current)} → <b>${fmt(parsed.current)}</b></p>
+      <h3>इस वर्ष का विवरण (${parsed.financialYear})</h3>
+      <p>Opening Date: ${parsed.openingDate}</p>
+      <p>Employee Contribution: ${fmt(parsed.contributionEmployee)} | Employer: ${fmt(parsed.contributionEmployer)} | EPS: ${fmt(parsed.contributionEPS)}</p>
+      <p>Transfers: Employee ${fmt(parsed.transferEmployee)} | Employer ${fmt(parsed.transferEmployer)} | EPS ${fmt(parsed.transferEPS)}</p>
+      <p>Withdrawals: Employee ${fmt(parsed.withdrawalEmployee)} | Employer ${fmt(parsed.withdrawalEmployer)} | EPS ${fmt(parsed.withdrawalEPS)}</p>
+      <p>Interest Updated Date: ${parsed.interestDate}</p>
+      <p>Interest: Employee ${fmt(parsed.interestEmployee)} | Employer ${fmt(parsed.interestEmployer)} | EPS ${fmt(parsed.interestEPS)}</p>
+      <h3>महीनेवार जमा (Wage Month)</h3>
+      ${monthly.length ? `
+        <div style="overflow-x:auto"><table>
+          <thead><tr><th>महीना</th><th>Employee</th><th>Employer</th><th>EPS</th><th>कुल</th></tr></thead>
+          <tbody>${monthly.map(r => `<tr><td>${r.wageMonth}</td><td>${fmt(r.employee)}</td><td>${fmt(r.employer)}</td><td>${fmt(r.eps)}</td><td>${fmt(r.total)}</td></tr>`).join("")}</tbody>
+        </table></div>
+        <p><b>महीनेवार कुल:</b> ${fmt(sum("employee"))} + ${fmt(sum("employer"))} + ${fmt(sum("eps"))} = ${fmt(sum("total"))}</p>
+        <p class="${parsed.monthlyContributionTotalsMatch ? "muted" : ""}"><b>${parsed.monthlyContributionTotalsMatch ? "FY Contribution Total से मिलान सफल।" : "महीनेवार योग FY Contribution Total से मेल नहीं खाता। इतिहास सेव नहीं होगा।"}</b></p>
+      ` : `<p>इस PDF में महीनेवार CR जमा entries नहीं मिलीं।</p>`}
+      <p class="muted">राशियों का Opening + Contribution + Transfer − Withdrawal + Interest से मिलान हुआ है। अभी Firestore में कोई बदलाव नहीं हुआ।</p>
+    `;
+    $("epfSaveBtn").disabled = false;
+    $("epfHistorySaveBtn").disabled = !parsed.monthlyContributionTotalsMatch;
+    $("epfPasswordArea").hidden = true;
+  } catch (err) {
+    if (err.name === "PasswordException") {
+      $("epfPasswordArea").hidden = false;
+      $("epfPreviewStatus").textContent = "PDF पासवर्ड से सुरक्षित है। पासवर्ड डालकर दोबारा EPF PDF पढ़ें।";
+    } else {
+      $("epfPreviewStatus").textContent = "EPF Preview नहीं बन पाया: " + err.message;
+    }
+  } finally {
+    $("epfPreviewBtn").disabled = false;
+  }
+};
+
+$("epfHistorySaveBtn").onclick = async () => {
+  const btn = $("epfHistorySaveBtn");
+  const parsed = epfPendingUpdate?.parsed;
+
+  if (!user || !parsed?.monthlyContributionTotalsMatch) {
+    message("पहले सही EPF PDF Preview तैयार करें।");
+    return;
+  }
+
+  btn.disabled = true;
+  try {
+    const rows = parsed.monthlyContributions || [];
+    const snapshots = collection(db, "users", user.uid, "monthlySnapshots");
+    const pending = [];
+    const changed = [];
+
+    for (const r of rows) {
+      if (!/^\d{4}-\d{2}$/.test(r.month)) continue;
+      const ref = doc(snapshots, r.month);
+      const old = await getDoc(ref);
+      const data = old.exists() ? old.data() : {};
+      const same = old.exists() &&
+        Number(data.epfContributionEmployee) === r.employee &&
+        Number(data.epfContributionEmployer) === r.employer &&
+        Number(data.epfContributionEPS) === r.eps &&
+        Number(data.epfContributionTotal) === r.total;
+
+      if (!same) {
+        pending.push({ref, row:r});
+        if (old.exists() && data.epfContributionTotal !== undefined) {
+          changed.push(r.month);
+        }
+      }
+    }
+
+    if (!pending.length) {
+      $("epfPreviewStatus").textContent =
+        "ये सभी EPF महीने पहले से सही सेव हैं। कोई duplicate नहीं जोड़ा गया।";
+      return;
+    }
+
+    const months = pending.map(x=>x.row.month).join(", ");
+    const warning = changed.length
+      ? "\nपहले से मौजूद EPF रकम इन महीनों में बदलेगी: " + changed.join(", ")
+      : "";
+    const total = pending.reduce((a,x)=>a+x.row.total,0);
+
+    if (!confirm(
+      `${pending.length} महीने का EPF इतिहास सेव होगा:\n${months}\nकुल नई/अपडेट रकम: ₹${total.toLocaleString("en-IN")}${warning}\n\nCAS और NPS के रिकॉर्ड सुरक्षित रहेंगे। क्या जारी रखें?`
+    )) {
+      $("epfPreviewStatus").textContent = "EPF इतिहास सेव करना रद्द किया गया।";
+      return;
+    }
+
+    for (const x of pending) {
+      const r = x.row;
+      await setDoc(x.ref, {
+        month: r.month,
+        epfContributionEmployee: r.employee,
+        epfContributionEmployer: r.employer,
+        epfContributionEPS: r.eps,
+        epfContributionTotal: r.total,
+        epfWageMonth: r.wageMonth,
+        epfTransactionDate: r.transactionDate,
+        epfSource: "EPF Passbook",
+        epfUpdatedAt: serverTimestamp()
+      }, {merge:true});
+    }
+
+    await loadMonthlySnapshots();
+    renderMonthlyGrowth();
+    $("epfPreviewStatus").textContent =
+      `${pending.length} महीने का EPF इतिहास सेव हो गया। पुराने CAS/NPS रिकॉर्ड सुरक्षित रहे।`;
+    message(`${pending.length} महीने का EPF इतिहास सेव हो गया।`);
+  } catch (err) {
+    $("epfPreviewStatus").textContent = "EPF इतिहास सेव नहीं हुआ: " + err.message;
+    message("EPF इतिहास सेव नहीं हुआ: " + err.message);
+  } finally {
+    btn.disabled = !epfPendingUpdate?.parsed?.monthlyContributionTotalsMatch;
+  }
+};
+
+$("epfSaveBtn").onclick = async () => {
+  if (!user || !epfPendingUpdate) return;
+  const {id, parsed, existing} = epfPendingUpdate;
+  const fmt = v => "₹" + Number(v || 0).toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2});
+  const warning = parsed.futureClosingDate
+    ? "\nध्यान दें: Closing Date PDF की Printed Date से आगे है।"
+    : "";
+  if (!confirm(
+    `मौजूदा EPF रिकॉर्ड अपडेट होगा। कोई नई Entry नहीं बनेगी।\n` +
+    `EPF Current: ${fmt(existing.current)} → ${fmt(parsed.current)}\n` +
+    `EPS Balance: ${fmt(existing.details?.epsBalance)} → ${fmt(parsed.epsBalance)}\n` +
+    `Closing Date: ${parsed.closingDate}${warning}\n\nक्या अपडेट सेव करें?`
+  )) return;
+
+  $("epfSaveBtn").disabled = true;
+  try {
+    const details = {
+      ...(existing.details || {}),
+      uanLast4:parsed.uanLast4,
+      employeeShare:parsed.employeeShare,
+      employerShare:parsed.employerShare,
+      epsBalance:parsed.epsBalance,
+      openingDate:parsed.openingDate,
+      openingEmployee:parsed.openingEmployee,
+      openingEmployer:parsed.openingEmployer,
+      openingEPS:parsed.openingEPS,
+      financialYear:parsed.financialYear,
+      contributionEmployee:parsed.contributionEmployee,
+      contributionEmployer:parsed.contributionEmployer,
+      contributionEPS:parsed.contributionEPS,
+      transferEmployee:parsed.transferEmployee,
+      transferEmployer:parsed.transferEmployer,
+      transferEPS:parsed.transferEPS,
+      withdrawalEmployee:parsed.withdrawalEmployee,
+      withdrawalEmployer:parsed.withdrawalEmployer,
+      withdrawalEPS:parsed.withdrawalEPS,
+      interestDate:parsed.interestDate,
+      interestEmployee:parsed.interestEmployee,
+      interestEmployer:parsed.interestEmployer,
+      interestEPS:parsed.interestEPS,
+      closingDate:parsed.closingDate,
+      printedDate:parsed.printedDate,
+      source:parsed.source
+    };
+    const data = {
+      invested:parsed.employeeShare,
+      current:parsed.current,
+      details,
+      notes:`EPFO Passbook Closing Balance as on ${parsed.closingDate}; Employee ${fmt(parsed.employeeShare)}; Employer ${fmt(parsed.employerShare)}; EPS ${fmt(parsed.epsBalance)}`,
+      updatedAt:serverTimestamp()
+    };
+    await updateDoc(doc(db,"users",user.uid,"holdings",id),data);
+    epfPendingUpdate = null;
+    await loadHoldings();
+    $("epfPreviewStatus").textContent = "मौजूदा EPF रिकॉर्ड सफलतापूर्वक अपडेट हो गया। नई Entry नहीं बनी है।";
+    $("epfPreviewSummary").innerHTML = "";
+    $("epfPdfPassword").value = "";
+    $("epfPdfFile").value = "";
+    message("मौजूदा EPF Entry अपडेट हो गई।");
+  } catch (err) {
+    $("epfSaveBtn").disabled = false;
+    message("EPF अपडेट सेव नहीं हुआ: " + err.message);
+  }
+};
+
+
+$("casPdfPreviewBtn").onclick = async () => {
+  const file = $("casPdfFile").files[0];
+  casPreviewRecords = [];
+  casPreviewTrendRecords = [];
+  $("saveMonthlyHistoryBtn").disabled = true;
+  $("monthlyHistoryStatus").textContent = "CAS PDF का Preview बाकी है।";
+  $("casImportBtn").disabled = true;
+  $("casPreviewSummary").innerHTML = "";
+  $("casPreviewTableWrap").hidden = true;
+
+  if (!file) {
+    $("casPreviewStatus").textContent = "पहले CAS PDF चुनें।";
+    return;
+  }
+
+  $("casPdfPreviewBtn").disabled = true;
+  $("casPreviewStatus").textContent = "PDF पढ़कर Holdings बनाई जा रही हैं...";
+
+  try {
+    const result = await window.extractCasPdfText(file, $("casPdfPassword").value);
+    const parsed = await window.parseCasHoldings(result.lines);
+    casPreviewRecords = parsed.records;
+
+    const trendRecords = window.parseCasPortfolioTrend(result.lines);
+    casPreviewTrendRecords = trendRecords;
+    const trendHtml = `
+      <h3>Monthly Portfolio Value Trend</h3>
+      <p>निकले हुए महीने: ${trendRecords.length}</p>
+      <table><thead><tr><th>महीना</th><th>Portfolio Value</th><th>बदलाव</th><th>%</th></tr></thead>
+      <tbody>${trendRecords.map(r => `<tr>
+        <td>${safe(r.month)}</td><td>${money(r.portfolioValue)}</td>
+        <td>${r.change === null ? "—" : money(r.change)}</td>
+        <td>${r.changePercent === null ? "—" : r.changePercent + "%"}</td>
+      </tr>`).join("")}</tbody></table>
+    `;
+
+    const existingKeys = new Set(holdings.map(x => x.details?.sourceKey).filter(Boolean));
+    const seen = new Set();
+    let duplicateCount = 0;
+
+    const rows = parsed.records.map(x => {
+      const key = x.details.sourceKey;
+      const duplicate = existingKeys.has(key) || seen.has(key);
+      seen.add(key);
+      if (duplicate) duplicateCount++;
+      return `<tr>
+        <td>${safe(x.category)}</td>
+        <td>${safe(x.name)}</td>
+        <td>${safe(x.details.account)}</td>
+        <td>${money(x.current)}</td>
+        <td>${duplicate ? "पहले से मौजूद" : "नई Entry"}</td>
+      </tr>`;
+    });
+
+    const counts = Object.entries(parsed.counts)
+      .map(([k,v]) => `${safe(k)}: ${v}`).join(" | ");
+    const categoryTotals = Object.entries(parsed.records.reduce((a,r) => {
+      a[r.category] = (a[r.category] || 0) + r.current;
+      return a;
+    }, {})).map(([k,v]) => `<p>${safe(k)} का कुल मूल्य: ${money(v)}</p>`).join("");
+    const debugIsins = ["INE079A01024","INE732I01021","INE028A01039","INE009A01021","INE075A01022","IN0020200393","INF209KB10C2","INF200K01TE8","INF740KA1UR9"];
+    const debugLines = debugIsins.map(isin => {
+      const i = result.lines.findIndex(line => line.includes(isin));
+      return i < 0 ? `${isin}: नहीं मिला` :
+        `${isin}\\n` + result.lines.slice(Math.max(0,i-2),i+5).join("\\n");
+    }).join("\\n\\n");
+    const debugHtml = `<pre style="white-space:pre-wrap;overflow-wrap:anywhere">${safe(debugLines)}</pre>`;
+    const debugRecords = parsed.records.filter((r,i) =>
+      i < 3 || debugIsins.includes(r.details?.isin)
+    ).map(r => ({
+      category:r.category, name:r.name, isin:r.details?.isin,
+      account:r.details?.account, units:r.quantity,
+      price:r.details?.price, current:r.current, invested:r.invested
+    }));
+    const debugRecordsHtml = `<pre style="white-space:pre-wrap;overflow-wrap:anywhere">${safe(JSON.stringify(debugRecords,null,2))}</pre>`;
+    const difference = Math.abs(parsed.total - 3010819.24);
+
+    $("casPreviewStatus").textContent =
+      `PDF पढ़ ली गई: ${result.pageCount} पेज | Statement तारीख: ${parsed.statementDate}`;
+    $("casPreviewSummary").innerHTML = `
+      ${trendHtml}
+      <p><b>निकली हुई Holdings:</b> ${parsed.records.length}</p>
+      <p><b>कुल वर्तमान मूल्य:</b> ${money(parsed.total)}</p>
+      <p><b>श्रेणी अनुसार:</b> ${counts}</p>
+      ${categoryTotals}
+      <h3>Parser से निकली Holdings की जाँच</h3>
+      ${debugRecordsHtml}
+      <h3>PDF पंक्तियों की जाँच</h3>
+      ${debugHtml}
+      <p><b>पहले से मौजूद:</b> ${duplicateCount} | <b>नई Entries:</b> ${parsed.records.length-duplicateCount}</p>
+      <p><b>पुराने CAS से अंतर:</b> ${money(difference)} ${difference < 1 ? "— मिलान सही" : "— जाँच जरूरी"}</p>`;
+
+    $("casPreviewBody").innerHTML = rows.join("");
+    $("casPreviewTableWrap").hidden = false;
+    $("casImportBtn").disabled = parsed.records.length === 0;
+    $("saveMonthlyHistoryBtn").disabled = trendRecords.length === 0;
+    $("monthlyHistoryStatus").textContent =
+      trendRecords.length + " महीनों का इतिहास सेव करने के लिए तैयार है।";
+    $("casPdfPasswordArea").hidden = true;
+  } catch (err) {
+    casPreviewRecords = [];
+    casPreviewTrendRecords = [];
+    $("saveMonthlyHistoryBtn").disabled = true;
+    if (err.name === "PasswordException") {
+      $("casPdfPasswordArea").hidden = false;
+      $("casPreviewStatus").textContent =
+        "यह PDF पासवर्ड से सुरक्षित है। पासवर्ड डालकर दोबारा PDF पढ़ें।";
+    } else {
+      $("casPreviewStatus").textContent = "PDF Preview नहीं बन पाया: " + err.message;
+    }
+  } finally {
+    $("casPdfPreviewBtn").disabled = false;
+  }
+};
+
+
+$("casPreviewBtn").onclick = async () => {
+  const file = $("casFile").files[0];
+  casPreviewRecords = [];
+  $("casImportBtn").disabled = true;
+  $("casPreviewSummary").innerHTML = "";
+  $("casPreviewTableWrap").hidden = true;
+
+  if (!file) {
+    $("casPreviewStatus").textContent = "पहले CAS JSON फाइल चुनें।";
+    return;
+  }
+
+  try {
+    const data = JSON.parse(await file.text());
+    if (!Array.isArray(data) || data.length === 0) {
+      throw new Error("JSON में रिकॉर्ड की सूची नहीं मिली।");
+    }
+
+    const allowed = ["Shares","Mutual Funds","ETF","SGB","REIT","InvIT"];
+    for (const x of data) {
+      if (!allowed.includes(x.category) || !x.name ||
+          !x.details?.sourceKey || !Number.isFinite(Number(x.current)) ||
+          !Number.isFinite(Number(x.invested))) {
+        throw new Error("फाइल में कोई रिकॉर्ड अधूरा या गलत है।");
+      }
+    }
+
+    casPreviewRecords = data;
+    const existingKeys = new Set(
+      holdings.map(x => x.details?.sourceKey).filter(Boolean)
+    );
+    const seen = new Set();
+    let duplicateCount = 0;
+    const counts = {};
+    let total = 0;
+
+    const rows = data.map(x => {
+      const key = x.details.sourceKey;
+      const duplicate = existingKeys.has(key) || seen.has(key);
+      seen.add(key);
+      if (duplicate) duplicateCount++;
+      counts[x.category] = (counts[x.category] || 0) + 1;
+      total += Number(x.current) || 0;
+      return `<tr>
+        <td>${safe(x.category)}</td>
+        <td>${safe(x.name)}</td>
+        <td>${safe(x.details.account || "SBI MF Folio")}</td>
+        <td>${money(x.current)}</td>
+        <td>${duplicate ? "पहले से मौजूद — छोड़ेंगे" : "नई Entry"}</td>
+      </tr>`;
+    });
+
+    const newCount = data.length - duplicateCount;
+    $("casPreviewStatus").textContent =
+      `फाइल: ${safe(file.name)} | कुल ${data.length} रिकॉर्ड`;
+    $("casPreviewSummary").innerHTML = `
+      <p><b>कुल वर्तमान मूल्य:</b> ${money(total)}</p>
+      <p><b>नई Entries:</b> ${newCount} | <b>डुप्लिकेट छोड़ेंगे:</b> ${duplicateCount}</p>
+      <p>${Object.entries(counts).map(([k,v]) =>
+        `${safe(k)}: ${v}`).join(" | ")}</p>
+    `;
+    $("casPreviewBody").innerHTML = rows.join("");
+    $("casPreviewTableWrap").hidden = false;
+    $("casImportBtn").disabled = newCount === 0;
+  } catch (err) {
+    casPreviewRecords = [];
+    $("casPreviewStatus").textContent = "Preview नहीं बन पाया: " + err.message;
+  }
+};
+
+$("casImportBtn").onclick = async () => {
+  if (!user || !casPreviewRecords.length) return;
+
+  const existingKeys = new Set(
+    holdings.map(x => x.details?.sourceKey).filter(Boolean)
+  );
+  const unique = [];
+  const seen = new Set();
+
+  for (const x of casPreviewRecords) {
+    const key = x.details.sourceKey;
+    if (!existingKeys.has(key) && !seen.has(key)) {
+      unique.push(x);
+      seen.add(key);
+    }
+  }
+
+  if (!unique.length) {
+    message("सभी CAS Entries पहले से मौजूद हैं।");
+    return;
+  }
+
+  if (!confirm(`${unique.length} नई CAS Entries Import होंगी। मौजूदा Entries नहीं हटेंगी। क्या जारी रखें?`)) return;
+
+  $("casImportBtn").disabled = true;
+  let added = 0;
+  try {
+    for (const x of unique) {
+      await addDoc(userCollection(), {
+        ...x,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      });
+      added++;
+    }
+    await loadHoldings();
+    $("casPreviewStatus").textContent =
+      `${added} CAS Entries सफलतापूर्वक Import हुईं।`;
+    message(`${added} CAS Entries Import हो गईं।`);
+    casPreviewRecords = [];
+  } catch (err) {
+    await loadHoldings();
+    $("casPreviewStatus").textContent =
+      `${added} Entries सेव हुईं। बाकी Import में समस्या आई: ${err.message}`;
+    message("Import में समस्या आई: " + err.message);
+  }
+};
+
+
+
+$("exportMonthlyGrowthBtn").onclick = () => {
+  const report = $("monthlyGrowthReport");
+  if (!report || !report.querySelector("#growthTableBody").children.length) {
+    message("पहले Monthly Growth Report तैयार करें।");
+    return;
+  }
+  window.print();
+};
+
+$("saveMonthlyHistoryBtn").onclick = async () => {
+  if (!user || !casPreviewTrendRecords.length) {
+    message("पहले CAS PDF का Preview तैयार करें।");
+    return;
+  }
+
+  const btn = $("saveMonthlyHistoryBtn");
+  btn.disabled = true;
+
+  try {
+    const snapshots = collection(db, "users", user.uid, "monthlySnapshots");
+    const pending = [];
+
+    for (const r of casPreviewTrendRecords) {
+      if (!/^\d{4}-\d{2}$/.test(r.month) ||
+          !Number.isFinite(Number(r.portfolioValue))) continue;
+
+      const ref = doc(snapshots, r.month);
+      const old = await getDoc(ref);
+      if (!old.exists()) pending.push({ref, month:r.month, value:Number(r.portfolioValue)});
+    }
+
+    if (!pending.length) {
+      $("monthlyHistoryStatus").textContent =
+        "ये सभी महीने पहले से सेव हैं। कोई नया रिकॉर्ड नहीं जोड़ा गया।";
+      return;
+    }
+
+    const monthList = pending.map(x=>x.month).join(", ");
+    if (!confirm(`${pending.length} नए महीने सेव होंगे:\n${monthList}\n\nपहले से सेव महीने नहीं बदलेंगे। क्या जारी रखें?`)) {
+      $("monthlyHistoryStatus").textContent = "सेव करना रद्द किया गया।";
+      return;
+    }
+
+    let saved = 0;
+    for (const x of pending) {
+      await setDoc(x.ref, {
+        month: x.month,
+        casValue: x.value,
+        source: "NSDL CAS",
+        updatedAt: serverTimestamp()
+      });
+      saved++;
+    }
+
+    $("monthlyHistoryStatus").textContent =
+      `${saved} महीने का CAS इतिहास सेव हो गया। पुराने रिकॉर्ड सुरक्षित रहे।`;
+    message(`${saved} महीने का मासिक इतिहास सेव हो गया।`);
+  } catch (err) {
+    $("monthlyHistoryStatus").textContent = "सेव नहीं हो पाया: " + err.message;
+    message("मासिक इतिहास सेव नहीं हुआ: " + err.message);
+  } finally {
+    btn.disabled = casPreviewTrendRecords.length === 0;
+  }
+};
+
+
+</script>
+<script>
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("/service-worker.js", { scope: "/" })
+        .catch(error => console.warn("Service Worker registration failed:", error));
+    });
+  }
+</script>
+</body>
+</html>
