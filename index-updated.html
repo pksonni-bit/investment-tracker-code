@@ -117,6 +117,15 @@ th{color:#657187;background:#f8f9fc}
 @media(max-width:850px){.dashboard-overview{grid-template-columns:1fr}}
 @media(max-width:520px){.dashboard-overview{gap:10px}.dashboard-section-head{display:block}.range-switch{margin-top:12px}.portfolio-trend-chart{min-height:190px}.quick-action-grid{gap:7px}}
 
+/* ===== Collapsible Portfolio ===== */
+.portfolio-heading{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.portfolio-heading h2{margin:0}
+.portfolio-toggle{background:linear-gradient(135deg,#2456a6,#3978d4);white-space:nowrap}
+#portfolioContent[hidden]{display:none!important}
+.portfolio-tools{margin:16px 0}
+.portfolio-panel .tablewrap{margin-top:10px}
+@media(max-width:520px){.portfolio-heading{align-items:flex-start}.portfolio-toggle{width:100%}.portfolio-tools>*{flex:1 1 100%}}
+
 /* ===== Dashboard Refresh (visual-only; app logic unchanged) ===== */
 :root{
   --ink:#17243b;--muted:#68778d;--line:#e7edf5;--surface:#ffffff;
@@ -718,13 +727,16 @@ header #account{color:#e5efff}
     <button type="button" id="epfHistorySaveBtn" disabled>EPF महीनेवार इतिहास सेव करें</button>
   </section>
 
-  <section class="panel">
-    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+  <section class="panel portfolio-panel" id="portfolioPanel">
+    <div class="portfolio-heading">
       <div>
         <h2>आपका Portfolio</h2>
         <div id="activeCategoryLabel" class="muted" style="margin-top:6px;font-weight:600;color:#2563eb">सभी निवेश</div>
       </div>
-      <div class="actions">
+      <button type="button" id="portfolioToggleBtn" class="portfolio-toggle" aria-expanded="false" aria-controls="portfolioContent">＋ Portfolio देखें</button>
+    </div>
+    <div id="portfolioContent" hidden>
+      <div class="actions portfolio-tools">
         <button type="button" id="pdfBtn">PDF Report</button>
         <button type="button" id="excelExportBtn" class="secondary">Excel Export</button>
         <button type="button" id="jsonBackupBtn" class="secondary">JSON Full Backup</button>
@@ -732,15 +744,15 @@ header #account{color:#e5efff}
         <input type="file" id="excelFile" accept=".xlsx,.xls" hidden>
         <input id="search" placeholder="नाम खोजें..." style="max-width:210px">
       </div>
-    </div>
-    <div class="tablewrap">
-      <table>
-        <thead><tr><th>Category</th><th>नाम</th><th>Symbol</th><th>Exchange</th><th>निवेश</th><th>वर्तमान मूल्य</th><th>लाभ/हानि</th><th>Action</th></tr></thead>
-        <tbody id="holdingsBody"><tr><td colspan="8">अभी कोई निवेश नहीं है।</td></tr></tbody>
-      </table>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Category</th><th>नाम</th><th>Symbol</th><th>Exchange</th><th>निवेश</th><th>वर्तमान मूल्य</th><th>लाभ/हानि</th><th>Action</th></tr></thead>
+          <tbody id="holdingsBody"><tr><td colspan="8">अभी कोई निवेश नहीं है।</td></tr></tbody>
+        </table>
+      </div>
+      <p class="muted">यह शुरुआती संस्करण है। वर्तमान मूल्य अभी स्वयं अपडेट करना होगा।</p>
     </div>
   </section>
-  <p class="muted">यह शुरुआती संस्करण है। वर्तमान मूल्य अभी स्वयं अपडेट करना होगा।</p>
 
   <div class="dashboard-modal" id="dashboardModal" aria-hidden="true">
     <div class="dashboard-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="dashboardModalTitle">
@@ -780,6 +792,18 @@ let incomes = [];
 let filter = "All";
 
 const $ = id => document.getElementById(id);
+
+function setPortfolioExpanded(expanded){
+  const content = $("portfolioContent");
+  const button = $("portfolioToggleBtn");
+  if (!content || !button) return;
+  content.hidden = !expanded;
+  button.setAttribute("aria-expanded", String(expanded));
+  button.textContent = expanded ? "－ Portfolio छिपाएँ" : "＋ Portfolio देखें";
+}
+$("portfolioToggleBtn")?.addEventListener("click", () => {
+  setPortfolioExpanded($("portfolioContent").hidden);
+});
 const money = n => new Intl.NumberFormat("en-IN",{style:"currency",currency:"INR",maximumFractionDigits:2}).format(Number(n)||0);
 const safe = s => String(s ?? "").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const userCollection = () => collection(db,"users",user.uid,"holdings");
@@ -1314,6 +1338,7 @@ pieChart.onmouseleave = () => {
         b.classList.toggle("secondary", !active);
       });
       render();
+      setPortfolioExpanded(true);
       $("holdingsBody").closest("section").scrollIntoView({
         behavior: "smooth",
         block: "start"
