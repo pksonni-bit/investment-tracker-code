@@ -254,6 +254,22 @@ label{font-weight:700;color:#52627a}
   nav{top:54px}
 }
 
+/* ===== Quick Action popup modals ===== */
+.dashboard-modal{position:fixed;inset:0;z-index:10000;background:rgba(13,27,49,.58);display:none;align-items:center;justify-content:center;padding:18px}
+.dashboard-modal.open{display:flex}
+.dashboard-modal-dialog{width:min(820px,100%);max-height:90vh;display:flex;flex-direction:column;background:#f6f8fc;border-radius:18px;overflow:hidden;box-shadow:0 24px 80px rgba(0,0,0,.28);animation:modalIn .18s ease-out}
+.dashboard-modal-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:15px 19px;background:#fff;border-bottom:1px solid #e6ebf3}
+.dashboard-modal-head h2{margin:0;color:#243b5d;font-size:17px}
+.dashboard-modal-close{width:38px;height:38px;padding:0;border-radius:10px;background:#edf2fa;color:#29466f;font-size:24px;line-height:1}
+.dashboard-modal-body{padding:14px 18px 20px;overflow:auto}
+.dashboard-modal-body>.panel{margin:0;border:0;box-shadow:none;padding:5px;background:transparent}
+.dashboard-modal-body>.panel h2{display:none}
+.dashboard-modal-body>.panel h2:after{display:none}
+.dashboard-modal-body>.panel .cards{margin-top:0}
+.dashboard-modal-body>.panel .tablewrap{max-width:100%}
+@keyframes modalIn{from{opacity:0;transform:translateY(10px) scale(.99)}to{opacity:1;transform:translateY(0) scale(1)}}
+@media(max-width:600px){.dashboard-modal{padding:8px;align-items:flex-end}.dashboard-modal-dialog{max-height:94vh;border-radius:17px 17px 10px 10px}.dashboard-modal-head{padding:12px 14px}.dashboard-modal-body{padding:10px 12px 16px}.dashboard-modal-body>.panel{padding:3px}.dashboard-modal-body>.panel .cards{grid-template-columns:1fr 1fr}}
+
 </style>
 </head>
 <body>
@@ -306,6 +322,7 @@ label{font-weight:700;color:#52627a}
       <p class="muted">ज़रूरी काम सीधे यहाँ से खोलें।</p>
       <div class="quick-action-grid">
         <button type="button" data-dashboard-action="add">+ निवेश जोड़ें</button>
+        <button type="button" class="secondary" data-dashboard-action="income">Dividend / Interest</button>
         <button type="button" class="secondary" data-dashboard-action="cas">CAS Import</button>
         <button type="button" class="secondary" data-dashboard-action="nps">NPS Update</button>
         <button type="button" class="secondary" data-dashboard-action="epf">EPF Update</button>
@@ -373,7 +390,7 @@ label{font-weight:700;color:#52627a}
     </div>
   </section>
 
-  <section class="panel">
+  <section class="panel" id="incomePanel">
     <h2>Dividend & Interest Income</h2>
     <div class="cards">
       <div class="card"><small>कुल प्राप्त आय</small><strong id="totalIncome">₹0</strong></div>
@@ -574,6 +591,16 @@ label{font-weight:700;color:#52627a}
     </div>
   </section>
   <p class="muted">यह शुरुआती संस्करण है। वर्तमान मूल्य अभी स्वयं अपडेट करना होगा।</p>
+
+  <div class="dashboard-modal" id="dashboardModal" aria-hidden="true">
+    <div class="dashboard-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="dashboardModalTitle">
+      <div class="dashboard-modal-head">
+        <h2 id="dashboardModalTitle">विवरण</h2>
+        <button type="button" class="dashboard-modal-close" id="dashboardModalClose" aria-label="बंद करें">×</button>
+      </div>
+      <div class="dashboard-modal-body" id="dashboardModalBody"></div>
+    </div>
+  </div>
 </main>
 
 <script type="module">
@@ -1088,7 +1115,35 @@ function renderDashboardInsight(){
 }
 
 function setupDashboardActions(){
-  const scrollTo=id=>$(id)?.scrollIntoView({behavior:"smooth",block:"start"});
+  const modal=$("dashboardModal"), body=$("dashboardModalBody"), title=$("dashboardModalTitle");
+  let activePlaceholder=null, activeElement=null;
+  const closeModal=()=>{
+    if(activeElement && activePlaceholder?.parentNode){
+      activePlaceholder.parentNode.insertBefore(activeElement,activePlaceholder);
+      activePlaceholder.remove();
+    }
+    activeElement=null;activePlaceholder=null;
+    modal?.classList.remove("open");
+    modal?.setAttribute("aria-hidden","true");
+    document.body.style.overflow="";
+  };
+  const openModal=(id,label)=>{
+    const el=$(id);
+    if(!el || !modal || !body) return;
+    if(activeElement) closeModal();
+    activePlaceholder=document.createComment("dashboard-modal-placeholder");
+    el.parentNode.insertBefore(activePlaceholder,el);
+    activeElement=el;
+    title.textContent=label;
+    body.appendChild(el);
+    modal.classList.add("open");
+    modal.setAttribute("aria-hidden","false");
+    document.body.style.overflow="hidden";
+    $("dashboardModalClose")?.focus();
+  };
+  $("dashboardModalClose")?.addEventListener("click",closeModal);
+  modal?.addEventListener("click",e=>{if(e.target===modal)closeModal();});
+  document.addEventListener("keydown",e=>{if(e.key==="Escape" && modal?.classList.contains("open"))closeModal();});
   $("portfolioRange")?.querySelectorAll("[data-range]").forEach(btn=>{
     btn.onclick=()=>{
       portfolioRange=btn.dataset.range;
@@ -1099,10 +1154,11 @@ function setupDashboardActions(){
   document.querySelectorAll("[data-dashboard-action]").forEach(btn=>{
     btn.onclick=()=>{
       const action=btn.dataset.dashboardAction;
-      if(action==="add") scrollTo("entryPanel");
-      if(action==="cas") scrollTo("casImportPanel");
-      if(action==="nps") scrollTo("npsUpdatePanel");
-      if(action==="epf") scrollTo("epfUpdatePanel");
+      if(action==="add") openModal("entryPanel","नया निवेश जोड़ें");
+      if(action==="income") openModal("incomePanel","Dividend & Interest Income");
+      if(action==="cas") openModal("casImportPanel","NSDL CAS Import");
+      if(action==="nps") openModal("npsUpdatePanel","NPS Update");
+      if(action==="epf") openModal("epfUpdatePanel","EPF Update");
       if(action==="report") $("pdfBtn")?.click();
       if(action==="backup") $("jsonBackupBtn")?.click();
     };
