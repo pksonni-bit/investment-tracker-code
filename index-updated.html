@@ -2038,25 +2038,12 @@ $("casPdfPreviewBtn").onclick = async () => {
     }));
     const debugRecordsHtml = `<pre style="white-space:pre-wrap;overflow-wrap:anywhere">${safe(JSON.stringify(debugRecords,null,2))}</pre>`;
     const statementMonth = String(parsed.statementDate || "").slice(0, 7);
-    const knownCasValues = new Map(growthCas);
-    savedMonthlySnapshots.forEach(s => {
-      if (/^\\d{4}-\\d{2}$/.test(s.month) &&
-          s.casValue !== undefined && s.casValue !== null &&
-          Number.isFinite(Number(s.casValue))) {
-        knownCasValues.set(s.month, Number(s.casValue));
-      }
+    const previousCas = new Map(growthCas);
+    savedMonthlySnapshots.forEach(x => {
+      if (/^\d{4}-\d{2}$/.test(x.month) && Number.isFinite(Number(x.casValue))) previousCas.set(x.month, Number(x.casValue));
     });
-    const referenceEntries = [...knownCasValues.entries()]
-      .filter(([month]) => !statementMonth || month < statementMonth)
-      .sort((a, b) => a[0].localeCompare(b[0]));
-    const referenceEntry = referenceEntries[referenceEntries.length - 1] ||
-      [...knownCasValues.entries()].sort((a, b) => a[0].localeCompare(b[0])).slice(-1)[0];
-    const difference = referenceEntry
-      ? Math.abs(parsed.total - Number(referenceEntry[1]))
-      : null;
-    const comparisonText = referenceEntry
-      ? `पिछले उपलब्ध CAS (${referenceEntry[0]}) से अंतर: ${money(difference)}${difference < 1 ? " — मिलान सही" : " — बदलाव जाँचें"}`
-      : "तुलना के लिए पुराना CAS रिकॉर्ड उपलब्ध नहीं है।";
+    const previousCasEntry = [...previousCas.entries()].filter(([month]) => month < statementMonth).sort((a,b)=>a[0].localeCompare(b[0])).pop();
+    const difference = previousCasEntry ? Math.abs(parsed.total - previousCasEntry[1]) : null;
 
     $("casPreviewStatus").textContent =
       `PDF पढ़ ली गई: ${result.pageCount} पेज | Statement तारीख: ${parsed.statementDate}`;
@@ -2071,7 +2058,7 @@ $("casPdfPreviewBtn").onclick = async () => {
       <h3>PDF पंक्तियों की जाँच</h3>
       ${debugHtml}
       <p><b>पहले से मौजूद:</b> ${duplicateCount} | <b>नई Entries:</b> ${parsed.records.length-duplicateCount}</p>
-      <p><b>${safe(comparisonText)}</b></p>`;
+      <p><b>पिछले CAS (${previousCasEntry ? previousCasEntry[0] : "रिकॉर्ड उपलब्ध नहीं"}) से अंतर:</b> ${difference === null ? "तुलना के लिए पिछला रिकॉर्ड नहीं मिला" : money(difference) + (difference < 1 ? " — मिलान सही" : " — जाँच जरूरी")}</p>`;
 
     $("casPreviewBody").innerHTML = rows.join("");
     $("casPreviewTableWrap").hidden = false;
@@ -2102,7 +2089,7 @@ $("casPreviewBtn").onclick = async () => {
   casPreviewRecords = [];
   casPreviewTrendRecords = [];
   $("saveMonthlyHistoryBtn").disabled = true;
-  $("monthlyHistoryStatus").textContent = "CAS JSON Preview में Monthly History सेव नहीं होती।";
+  $("monthlyHistoryStatus").textContent = "CAS PDF का Preview बाकी है।";
   $("casImportBtn").disabled = true;
   $("casPreviewSummary").innerHTML = "";
   $("casPreviewTableWrap").hidden = true;
@@ -2168,7 +2155,7 @@ $("casPreviewBtn").onclick = async () => {
     casPreviewRecords = [];
     casPreviewTrendRecords = [];
     $("saveMonthlyHistoryBtn").disabled = true;
-    $("monthlyHistoryStatus").textContent = "CAS JSON Preview में Monthly History सेव नहीं होती।";
+    $("monthlyHistoryStatus").textContent = "CAS PDF का Preview बाकी है।";
     $("casPreviewStatus").textContent = "Preview नहीं बन पाया: " + err.message;
   }
 };
@@ -2244,45 +2231,25 @@ $("saveMonthlyHistoryBtn").onclick = async () => {
   try {
     const snapshots = collection(db, "users", user.uid, "monthlySnapshots");
     const pending = [];
-    let unchanged = 0;
-    const replacing = [];
 
     for (const r of casPreviewTrendRecords) {
-      if (!/^\\d{4}-\\d{2}$/.test(r.month) ||
+      if (!/^\d{4}-\d{2}$/.test(r.month) ||
           !Number.isFinite(Number(r.portfolioValue))) continue;
 
       const ref = doc(snapshots, r.month);
       const old = await getDoc(ref);
       const oldData = old.exists() ? old.data() : {};
-      const value = Number(r.portfolioValue);
-      const hasOldCas = oldData.casValue !== undefined &&
-        oldData.casValue !== null &&
-        Number.isFinite(Number(oldData.casValue));
-
-      if (hasOldCas && Math.abs(Number(oldData.casValue) - value) < 0.01) {
-        unchanged++;
-        continue;
-      }
-
-      if (hasOldCas) replacing.push(r.month);
-      pending.push({ref, month:r.month, value});
+      if (oldData.casValue === undefined || oldData.casValue === null) pending.push({ref, month:r.month, value:Number(r.portfolioValue)});
     }
 
     if (!pending.length) {
       $("monthlyHistoryStatus").textContent =
-        unchanged
-          ? `सभी ${unchanged} CAS महीने पहले से समान रूप में सेव हैं। कोई बदलाव नहीं किया गया।`
-          : "सेव करने योग्य CAS रिकॉर्ड नहीं मिला।";
+        "ये सभी महीने पहले से सेव हैं। कोई नया रिकॉर्ड नहीं जोड़ा गया।";
       return;
     }
 
     const monthList = pending.map(x=>x.month).join(", ");
-    const replaceNote = replacing.length
-      ? `\\nइन महीनों का पुराना CAS मूल्य बदलेगा: ${replacing.join(", ")}`
-      : "";
-    if (!confirm(
-      `${pending.length} CAS महीने सेव/अपडेट होंगे:\\n${monthList}${replaceNote}\\n\\nकिसी भी महीने का NPS और EPF/EPS डेटा सुरक्षित रहेगा। क्या जारी रखें?`
-    )) {
+    if (!confirm(`${pending.length} नए महीने सेव होंगे:\n${monthList}\n\nपहले से सेव महीने नहीं बदलेंगे। क्या जारी रखें?`)) {
       $("monthlyHistoryStatus").textContent = "सेव करना रद्द किया गया।";
       return;
     }
@@ -2301,8 +2268,8 @@ $("saveMonthlyHistoryBtn").onclick = async () => {
     await loadMonthlySnapshots();
     renderMonthlyGrowth();
     $("monthlyHistoryStatus").textContent =
-      `${saved} महीने का CAS इतिहास सेव/अपडेट हो गया। NPS और EPF/EPS रिकॉर्ड सुरक्षित रहे।`;
-    message(`${saved} महीने का CAS इतिहास सेव/अपडेट हो गया।`);
+      `${saved} महीने का CAS इतिहास सेव हो गया। पुराने NPS/EPF रिकॉर्ड सुरक्षित रहे।`;
+    message(`${saved} महीने का मासिक इतिहास सेव हो गया।`);
   } catch (err) {
     $("monthlyHistoryStatus").textContent = "सेव नहीं हो पाया: " + err.message;
     message("मासिक इतिहास सेव नहीं हुआ: " + err.message);
