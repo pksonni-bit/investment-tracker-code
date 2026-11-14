@@ -1406,9 +1406,13 @@ pieChart.onmouseleave = () => {
     const epfSummary = isEpf
       ? `<br><span class="muted">Employee: ${money(x.details?.employeeShare)} | Employer: ${money(x.details?.employerShare)} | EPS: ${money(x.details?.epsBalance)} | EPF + EPS कुल: ${money((Number(x.current)||0)+(Number(x.details?.epsBalance)||0))}</span>`
       : "";
+    const rawSymbol = String(x.details?.symbol||"").trim();
+    // BSE Scrip Code 535276 is the exchange code for SBI BSE SENSEX ETF; show its trading symbol.
+    const displaySymbol = x.category==="ETF" && String(x.details?.exchange||"").toUpperCase()==="BSE" && rawSymbol==="535276"
+      ? "SBISENSEX" : rawSymbol;
     return `<tr>
       <td>${safe(x.category)}</td><td><b>${safe(x.name)}</b><br><span class="muted">${safe(x.date||"")}</span>${epfSummary}</td>
-      <td>${["Shares","ETF","REIT","InvIT"].includes(x.category) ? safe(x.details?.symbol||"—") : "—"}</td><td>${["Shares","ETF","REIT","InvIT"].includes(x.category) ? safe(x.details?.exchange||"—") : "—"}</td>
+      <td>${["Shares","ETF","REIT","InvIT"].includes(x.category) ? safe(displaySymbol||"—") : "—"}</td><td>${["Shares","ETF","REIT","InvIT"].includes(x.category) ? safe(x.details?.exchange||"—") : "—"}</td>
       <td>${costKnown ? money(x.invested) : "लागत उपलब्ध नहीं"}</td><td>${money(x.current)}</td>
       <td class="${p>=0?"profit":"loss"}">${isEpf ? "—" : (costKnown ? money(p) : "—")}</td>
       <td><div class="actions"><button class="secondary" data-edit="${safe(x.id)}">Edit</button><button class="danger" data-delete="${safe(x.id)}">Delete</button></div></td>
