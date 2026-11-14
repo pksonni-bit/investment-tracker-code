@@ -296,6 +296,7 @@ label{font-weight:700;color:#52627a}
 
     <div class="cards">
       <div class="card"><small>कुल Portfolio Value (CAS + NPS)</small><strong id="growthTotalValue">—</strong></div>
+      <div class="card"><small>कुल निवेश मूल्य (CAS + NPS + EPF/EPS)</small><strong id="growthTotalWithEpf">—</strong></div>
       <div class="card"><small>पिछले महीने से बदलाव</small><strong id="growthMonthlyChange">—</strong></div>
       <div class="card"><small>बदलाव प्रतिशत</small><strong id="growthMonthlyPercent">—</strong></div>
     </div>
@@ -313,6 +314,7 @@ label{font-weight:700;color:#52627a}
             <th>NPS</th>
             <th>EPF/EPS योगदान</th>
             <th>कुल Portfolio Value (CAS + NPS)</th>
+            <th>कुल (CAS + NPS + EPF/EPS)</th>
             <th>मासिक बदलाव</th>
           </tr>
         </thead>
@@ -941,11 +943,17 @@ function renderMonthlyGrowth(){
     return {month,label,casValue,npsValue,total,contribution,change};
   });
 
+  // EPF current balance में Employee + Employer और अलग EPS pension balance शामिल हैं।
+  const epfCurrentValue = holdings
+    .filter(x => x.category === "EPF")
+    .reduce((sum, x) => sum + (Number(x.current) || 0) + (Number(x.details?.epsBalance) || 0), 0);
+
   const latest = rows[rows.length-1];
   const prior = rows[rows.length-2];
   const pct = prior.total ? (latest.change/prior.total*100) : 0;
 
   $("growthTotalValue").textContent = money(latest.total);
+  $("growthTotalWithEpf").textContent = money(latest.total + epfCurrentValue);
   $("growthMonthlyChange").textContent =
     latest.change === null ? "—" : money(latest.change);
   $("growthMonthlyPercent").textContent =
@@ -958,6 +966,7 @@ function renderMonthlyGrowth(){
       <td>${r.npsValue===null ? "—" : money(r.npsValue)}</td>
       <td>${r.contribution===null ? "—" : money(r.contribution)}</td>
       <td><b>${money(r.total)}</b></td>
+      <td><b>${r.month === latest.month ? money(r.total + epfCurrentValue) : "—"}</b></td>
       <td class="${r.change===null ? "" : r.change>=0 ? "profit" : "loss"}">
         ${r.change===null ? "—" : money(r.change)}
       </td>
@@ -973,6 +982,7 @@ function renderMonthlyGrowth(){
         <span>NSDL CAS: ${money(r.casValue)}</span>
         <span>NPS: ${r.npsValue===null ? "—" : money(r.npsValue)}</span>
         <span>EPF/EPS योगदान: ${r.contribution===null ? "—" : money(r.contribution)}</span>
+        ${r.month === latest.month ? `<span>EPF/EPS वर्तमान बैलेंस: ${money(epfCurrentValue)}</span>` : ""}
       </div>
     </div>
   `).join("");
